@@ -1,0 +1,69 @@
+# Rust specific
+/target/
+**/*.rs.bk
+Cargo.lock
+
+# IDE specific
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Build artifacts
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+*.slc
+*.slo
+*.slh
+
+# Debug files
+*.pdb
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Test coverage
+coverage/
+*.profraw
+
+# Documentation
+doc/_build/
+doc/api/_build/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.log
+*.tmp
+*.temp
+*.bak
+
+# Generated files
+*.generated.sl
+*.ast
+*.ir
+*.ll
+*.bc
+
+# Dependencies
+vendor/
+deps/
+
+# Project specific
+build/
+dist/
+release/
+debug/ 
