@@ -160,6 +160,41 @@ pub enum Token {
     // エラー
     #[error]
     Error,
+
+    #[token("+")]
+    Plus,
+    #[token("-")]
+    Minus,
+    #[token("*")]
+    Star,
+    #[token("/")]
+    Slash,
+    #[token("%")]
+    Percent,
+    #[token("==")]
+    EqualsEquals,
+    #[token("!=")]
+    NotEquals,
+    #[token("<")]
+    LessThan,
+    #[token(">")]
+    GreaterThan,
+    #[token("<=")]
+    LessThanEquals,
+    #[token(">=")]
+    GreaterThanEquals,
+    #[token("(")]
+    LParen,
+    #[token(")")]
+    RParen,
+    #[token("{")]
+    LBrace,
+    #[token("}")]
+    RBrace,
+    #[token("[")]
+    LBracket,
+    #[token("]")]
+    RBracket,
 }
 
 pub struct Lexer<'a> {
