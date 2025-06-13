@@ -63,7 +63,7 @@ impl Runtime {
                 let args = arguments.iter()
                     .map(|arg| self.evaluate_value(arg))
                     .collect::<Result<Vec<_>>>()?;
-                let result = self.execute_function_call(function, &args)?;
+                let result = self.execute_function_call(function, args)?;
                 self.memory_manager.heap.insert(dest.clone(), result);
             }
             crate::ir::IRInstruction::Return(value) => {

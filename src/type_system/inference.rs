@@ -204,6 +204,7 @@ impl TypeInference {
                 self.add_constraint(right.clone(), Type::Bool)?;
                 Ok(Type::Bool)
             }
+            _ => todo!(),
         }
     }
 
@@ -220,6 +221,7 @@ impl TypeInference {
                 self.add_constraint(expr, Type::Bool)?;
                 Ok(Type::Bool)
             }
+            _ => todo!(),
         }
     }
 
