@@ -1,3 +1,11 @@
+mod inference;
+mod cast;
+mod checker;
+
+pub use inference::TypeInference;
+pub use cast::TypeCast;
+pub use checker::TypeChecker;
+
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
