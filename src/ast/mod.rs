@@ -160,6 +160,29 @@ pub enum Literal {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum BinaryOperator {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    Equals,
+    NotEquals,
+    LessThan,
+    GreaterThan,
+    LessThanEquals,
+    GreaterThanEquals,
+    And,
+    Or,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum UnaryOperator {
+    Neg,
+    Not,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct BinaryOpExpression {
     pub left: Box<Expression>,
     pub op: BinaryOperator,
@@ -167,32 +190,9 @@ pub struct BinaryOpExpression {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum BinaryOperator {
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Mod,
-    Eq,
-    Neq,
-    Lt,
-    Lte,
-    Gt,
-    Gte,
-    And,
-    Or,
-}
-
-#[derive(Debug, Clone, PartialEq)]
 pub struct UnaryOpExpression {
     pub op: UnaryOperator,
     pub right: Box<Expression>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum UnaryOperator {
-    Neg,
-    Not,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -531,12 +531,12 @@ impl fmt::Display for BinaryOperator {
             BinaryOperator::Mul => write!(f, "*"),
             BinaryOperator::Div => write!(f, "/"),
             BinaryOperator::Mod => write!(f, "%"),
-            BinaryOperator::Eq => write!(f, "=="),
-            BinaryOperator::Neq => write!(f, "!="),
-            BinaryOperator::Lt => write!(f, "<"),
-            BinaryOperator::Lte => write!(f, "<="),
-            BinaryOperator::Gt => write!(f, ">"),
-            BinaryOperator::Gte => write!(f, ">="),
+            BinaryOperator::Equals => write!(f, "=="),
+            BinaryOperator::NotEquals => write!(f, "!="),
+            BinaryOperator::LessThan => write!(f, "<"),
+            BinaryOperator::GreaterThan => write!(f, ">"),
+            BinaryOperator::LessThanEquals => write!(f, "<="),
+            BinaryOperator::GreaterThanEquals => write!(f, ">="),
             BinaryOperator::And => write!(f, "&&"),
             BinaryOperator::Or => write!(f, "||"),
         }
