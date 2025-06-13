@@ -288,6 +288,7 @@ impl Runtime {
                     Err(SlangError::Runtime("Invalid operands for greater than or equal".to_string()))
                 }
             }
+            _ => todo!(),
         }
     }
 
@@ -313,6 +314,7 @@ impl Runtime {
                     Err(SlangError::Runtime("Invalid operand for logical not".to_string()))
                 }
             }
+            _ => todo!(),
         }
     }
 
