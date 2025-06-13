@@ -36,17 +36,15 @@ impl Runtime {
 
     fn execute_instruction(&mut self, instruction: &crate::ir::IRInstruction) -> Result<()> {
         match instruction {
-            crate::ir::IRInstruction::Let { name, value } => {
+            crate::ir::IRInstruction::Store { name, value } => {
                 let value = self.evaluate_value(value)?;
                 self.memory_manager.allocate_value(name.clone(), value);
             }
             crate::ir::IRInstruction::Return(value) => {
-                let value = self.evaluate_value(value)?;
-                println!("Return value: {:?}", value);
-            }
-            crate::ir::IRInstruction::Expression(value) => {
-                let value = self.evaluate_value(value)?;
-                println!("Expression value: {:?}", value);
+                if let Some(value) = value {
+                    let value = self.evaluate_value(value)?;
+                    println!("Return value: {:?}", value);
+                }
             }
         }
         Ok(())
@@ -59,6 +57,7 @@ impl Runtime {
                 crate::ir::IRConstant::Float(f) => Ok(Box::new(*f)),
                 crate::ir::IRConstant::String(s) => Ok(Box::new(s.clone())),
                 crate::ir::IRConstant::Boolean(b) => Ok(Box::new(*b)),
+                crate::ir::IRConstant::Unit => Ok(Box::new(())),
             },
             crate::ir::IRValue::Variable(name) => {
                 self.memory_manager.get_value(name).ok_or_else(|| {
@@ -81,9 +80,9 @@ impl Runtime {
                     .collect::<Result<Vec<_>>>()?;
                 self.execute_function_call(function, args)
             }
-            crate::ir::IRValue::Assignment { name, value } => {
+            crate::ir::IRValue::Assignment { target, value } => {
                 let value = self.evaluate_value(value)?;
-                self.memory_manager.allocate_value(name.clone(), value);
+                self.memory_manager.allocate_value(target.clone(), value);
                 Ok(Box::new(()))
             }
         }
@@ -355,12 +354,12 @@ impl MemoryManager {
     }
 
     fn get_value(&self, name: &str) -> Option<Box<dyn Any>> {
-        self.heap.get(name).cloned()
+        self.heap.get(name).map(|v| v.clone())
     }
 
     fn deallocate(&mut self, address: usize) {
         if address < self.stack.len() {
-            self.stack.remove(address);
+            self.stack[address] = Box::new(vec![0u8; 0]);
         }
     }
 }
@@ -377,7 +376,7 @@ impl PriorityOwnershipManager {
     }
 
     fn set_priority(&mut self, name: String, priority: i32) {
-        self.priorities.insert(name, vec![priority]);
+        self.priorities.entry(name).or_insert_with(Vec::new).push(priority);
     }
 
     fn get_priority(&self, name: &str) -> Option<&Vec<i32>> {
@@ -385,11 +384,15 @@ impl PriorityOwnershipManager {
     }
 
     fn transfer_ownership(&mut self, from: &str, to: &str) -> Result<()> {
-        if let Some(priority) = self.priorities.remove(from) {
-            self.priorities.insert(to.to_string(), priority);
-            Ok(())
+        if let Some(priorities) = self.priorities.get(from) {
+            if let Some(last_priority) = priorities.last() {
+                self.set_priority(to.to_string(), *last_priority);
+                Ok(())
+            } else {
+                Err(SlangError::Runtime("No priority found for source".to_string()))
+            }
         } else {
-            Err(SlangError::Runtime(format!("No priority found for: {}", from)))
+            Err(SlangError::Runtime("Source not found".to_string()))
         }
     }
 }
@@ -408,7 +411,7 @@ impl StandardLibrary {
                     println!("{:?}", arg);
                 }
                 Ok(Box::new(()))
-            }),
+            }) as Box<dyn Fn(&[Box<dyn Any>]) -> Result<Box<dyn Any>>>,
         );
         Self { functions }
     }
