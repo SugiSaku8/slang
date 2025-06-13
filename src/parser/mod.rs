@@ -36,13 +36,13 @@ impl<'a> Parser<'a> {
         let name = self.parse_identifier()?;
         let parameters = self.parse_parameters()?;
         let return_type = self.parse_return_type()?;
-        let priorities = self.parse_priority()?;
+        let priority = self.parse_priority()?;
         let body = self.parse_block()?;
         Ok(Function {
             name,
             parameters,
             return_type,
-            priorities,
+            priority,
             body,
         })
     }
@@ -55,8 +55,8 @@ impl<'a> Parser<'a> {
                 loop {
                     let name = self.parse_identifier()?;
                     self.expect(Token::Colon)?;
-                    let type_ = self.parse_type()?;
-                    parameters.push(Parameter { name, type_ });
+                    let type_annotation = self.parse_type()?;
+                    parameters.push(Parameter { name, type_annotation });
                     if let Some(token) = self.peek() {
                         if token == &Token::RParen {
                             break;
@@ -77,53 +77,41 @@ impl<'a> Parser<'a> {
         self.parse_type()
     }
 
-    fn parse_priority(&mut self) -> Result<Vec<i32>> {
-        let mut priorities = Vec::new();
+    fn parse_priority(&mut self) -> Result<i32> {
+        let mut priority = 0;
         if let Some(token) = self.peek() {
             if token == &Token::Priority {
                 self.next();
-                self.expect(Token::LeftBracket)?;
-                loop {
-                    if let Some(token) = self.peek() {
-                        match token {
-                            Token::MostHigh => {
-                                priorities.push(i32::MAX);
-                                self.next();
-                            }
-                            Token::IntegerLiteral(priority) => {
-                                priorities.push(*priority as i32);
-                                self.next();
-                            }
-                            _ => break,
+                self.expect(Token::LBracket)?;
+                if let Some(token) = self.peek() {
+                    match token {
+                        Token::MostHigh => {
+                            priority = i32::MAX;
+                            self.next();
                         }
-                        if let Some(token) = self.peek() {
-                            if token == &Token::RightBracket {
-                                break;
-                            }
-                            self.expect(Token::Comma)?;
-                        } else {
-                            return Err(SlangError::Syntax("Expected ']' or ','".to_string()));
+                        Token::IntegerLiteral(p) => {
+                            priority = *p as i32;
+                            self.next();
                         }
-                    } else {
-                        return Err(SlangError::Syntax("Expected priority value".to_string()));
+                        _ => {}
                     }
                 }
-                self.expect(Token::RightBracket)?;
+                self.expect(Token::RBracket)?;
             }
         }
-        Ok(priorities)
+        Ok(priority)
     }
 
     fn parse_block(&mut self) -> Result<Block> {
-        self.expect(Token::LeftBrace)?;
+        self.expect(Token::LBrace)?;
         let mut statements = Vec::new();
         while let Some(token) = self.peek() {
-            if token == &Token::RightBrace {
+            if token == &Token::RBrace {
                 break;
             }
             statements.push(self.parse_statement()?);
         }
-        self.expect(Token::RightBrace)?;
+        self.expect(Token::RBrace)?;
         Ok(Block { statements })
     }
 
@@ -148,8 +136,8 @@ impl<'a> Parser<'a> {
                 self.expect(Token::LParen)?;
                 let condition = self.parse_expression()?;
                 self.expect(Token::RParen)?;
-                let then_branch = self.parse_block()?;
-                let else_branch = if let Some(token) = self.peek() {
+                let then_block = self.parse_block()?;
+                let else_block = if let Some(token) = self.peek() {
                     if token == &Token::Else {
                         self.next();
                         Some(self.parse_block()?)
@@ -160,9 +148,9 @@ impl<'a> Parser<'a> {
                     None
                 };
                 Ok(Statement::If(IfStatement {
-                    condition,
-                    then_branch,
-                    else_branch,
+                    condition: Box::new(condition),
+                    then_block,
+                    else_block,
                 }))
             }
             Some(Token::While) => {
@@ -171,29 +159,25 @@ impl<'a> Parser<'a> {
                 let condition = self.parse_expression()?;
                 self.expect(Token::RParen)?;
                 let body = self.parse_block()?;
-                Ok(Statement::While(WhileStatement { condition, body }))
+                Ok(Statement::While(WhileStatement { condition: Box::new(condition), body }))
             }
             Some(Token::For) => {
                 self.next();
                 self.expect(Token::LParen)?;
-                let pattern = self.parse_pattern()?;
+                let variable = self.parse_identifier()?;
                 self.expect(Token::In)?;
-                let iterable = self.parse_expression()?;
+                let iterator = self.parse_expression()?;
                 self.expect(Token::RParen)?;
                 let body = self.parse_block()?;
-                Ok(Statement::For(ForStatement {
-                    pattern,
-                    iterable,
-                    body,
-                }))
+                Ok(Statement::For(ForStatement { variable, iterator: Box::new(iterator), body }))
             }
             Some(Token::Match) => {
                 self.next();
-                let value = self.parse_expression()?;
-                self.expect(Token::LeftBrace)?;
+                let expression = self.parse_expression()?;
+                self.expect(Token::LBrace)?;
                 let mut arms = Vec::new();
                 while let Some(token) = self.peek() {
-                    if token == &Token::RightBrace {
+                    if token == &Token::RBrace {
                         break;
                     }
                     let pattern = self.parse_pattern()?;
@@ -201,8 +185,8 @@ impl<'a> Parser<'a> {
                     let body = self.parse_block()?;
                     arms.push(MatchArm { pattern, body });
                 }
-                self.expect(Token::RightBrace)?;
-                Ok(Statement::Match(MatchStatement { value, arms }))
+                self.expect(Token::RBrace)?;
+                Ok(Statement::Match(MatchStatement { expression: Box::new(expression), arms }))
             }
             _ => {
                 let expr = self.parse_expression()?;
@@ -223,7 +207,7 @@ impl<'a> Parser<'a> {
                 self.next();
                 let value = self.parse_assignment()?;
                 if let Expression::Identifier(name) = expr {
-                    return Ok(Expression::Assignment(AssignmentExpression { name, value }));
+                    return Ok(Expression::Assignment(Box::new(AssignmentExpression { target: name, value: Box::new(value) })));
                 }
                 return Err(SlangError::Syntax("Invalid assignment target".to_string()));
             }
@@ -238,20 +222,20 @@ impl<'a> Parser<'a> {
                 Token::EqualsEquals => {
                     self.next();
                     let right = self.parse_comparison()?;
-                    expr = Expression::BinaryOp(BinaryOpExpression {
+                    expr = Expression::BinaryOp(Box::new(BinaryOpExpression {
                         left: Box::new(expr),
-                        op: BinaryOperator::Equals,
+                        op: BinaryOperator::Eq,
                         right: Box::new(right),
-                    });
+                    }));
                 }
                 Token::NotEquals => {
                     self.next();
                     let right = self.parse_comparison()?;
-                    expr = Expression::BinaryOp(BinaryOpExpression {
+                    expr = Expression::BinaryOp(Box::new(BinaryOpExpression {
                         left: Box::new(expr),
-                        op: BinaryOperator::NotEquals,
+                        op: BinaryOperator::Neq,
                         right: Box::new(right),
-                    });
+                    }));
                 }
                 _ => break,
             }
@@ -266,38 +250,38 @@ impl<'a> Parser<'a> {
                 Token::LessThan => {
                     self.next();
                     let right = self.parse_term()?;
-                    expr = Expression::BinaryOp(BinaryOpExpression {
+                    expr = Expression::BinaryOp(Box::new(BinaryOpExpression {
                         left: Box::new(expr),
-                        op: BinaryOperator::LessThan,
+                        op: BinaryOperator::Lt,
                         right: Box::new(right),
-                    });
+                    }));
                 }
                 Token::GreaterThan => {
                     self.next();
                     let right = self.parse_term()?;
-                    expr = Expression::BinaryOp(BinaryOpExpression {
+                    expr = Expression::BinaryOp(Box::new(BinaryOpExpression {
                         left: Box::new(expr),
-                        op: BinaryOperator::GreaterThan,
+                        op: BinaryOperator::Gt,
                         right: Box::new(right),
-                    });
+                    }));
                 }
                 Token::LessThanEquals => {
                     self.next();
                     let right = self.parse_term()?;
-                    expr = Expression::BinaryOp(BinaryOpExpression {
+                    expr = Expression::BinaryOp(Box::new(BinaryOpExpression {
                         left: Box::new(expr),
-                        op: BinaryOperator::LessThanEquals,
+                        op: BinaryOperator::Lte,
                         right: Box::new(right),
-                    });
+                    }));
                 }
                 Token::GreaterThanEquals => {
                     self.next();
                     let right = self.parse_term()?;
-                    expr = Expression::BinaryOp(BinaryOpExpression {
+                    expr = Expression::BinaryOp(Box::new(BinaryOpExpression {
                         left: Box::new(expr),
-                        op: BinaryOperator::GreaterThanEquals,
+                        op: BinaryOperator::Gte,
                         right: Box::new(right),
-                    });
+                    }));
                 }
                 _ => break,
             }
@@ -312,20 +296,20 @@ impl<'a> Parser<'a> {
                 Token::Plus => {
                     self.next();
                     let right = self.parse_factor()?;
-                    expr = Expression::BinaryOp(BinaryOpExpression {
+                    expr = Expression::BinaryOp(Box::new(BinaryOpExpression {
                         left: Box::new(expr),
                         op: BinaryOperator::Add,
                         right: Box::new(right),
-                    });
+                    }));
                 }
                 Token::Minus => {
                     self.next();
                     let right = self.parse_factor()?;
-                    expr = Expression::BinaryOp(BinaryOpExpression {
+                    expr = Expression::BinaryOp(Box::new(BinaryOpExpression {
                         left: Box::new(expr),
                         op: BinaryOperator::Sub,
                         right: Box::new(right),
-                    });
+                    }));
                 }
                 _ => break,
             }
@@ -340,29 +324,29 @@ impl<'a> Parser<'a> {
                 Token::Star => {
                     self.next();
                     let right = self.parse_unary()?;
-                    expr = Expression::BinaryOp(BinaryOpExpression {
+                    expr = Expression::BinaryOp(Box::new(BinaryOpExpression {
                         left: Box::new(expr),
                         op: BinaryOperator::Mul,
                         right: Box::new(right),
-                    });
+                    }));
                 }
                 Token::Slash => {
                     self.next();
                     let right = self.parse_unary()?;
-                    expr = Expression::BinaryOp(BinaryOpExpression {
+                    expr = Expression::BinaryOp(Box::new(BinaryOpExpression {
                         left: Box::new(expr),
-                        op: BinaryOperator::Divide,
+                        op: BinaryOperator::Div,
                         right: Box::new(right),
-                    });
+                    }));
                 }
                 Token::Percent => {
                     self.next();
                     let right = self.parse_unary()?;
-                    expr = Expression::BinaryOp(BinaryOpExpression {
+                    expr = Expression::BinaryOp(Box::new(BinaryOpExpression {
                         left: Box::new(expr),
-                        op: BinaryOperator::Modulo,
+                        op: BinaryOperator::Mod,
                         right: Box::new(right),
-                    });
+                    }));
                 }
                 _ => break,
             }
@@ -459,10 +443,10 @@ impl<'a> Parser<'a> {
                 self.next();
                 Ok(Type::Named(name.clone()))
             }
-            Some(Token::LeftBracket) => {
+            Some(Token::LBracket) => {
                 self.next();
                 let element_type = Box::new(self.parse_type()?);
-                self.expect(Token::RightBracket)?;
+                self.expect(Token::RBracket)?;
                 Ok(Type::Array(element_type))
             }
             Some(Token::LParen) => {
