@@ -122,10 +122,7 @@ impl Type {
                 *p = Some(priority);
                 Ok(())
             }
-            _ => Err(Error::new(
-                "Cannot set priority for non-function type",
-                None,
-            )),
+            _ => Err(SlangError::Type("Cannot set priority for non-function type".to_string())),
         }
     }
 
