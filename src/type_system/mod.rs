@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt;
 
 use crate::ast::*;
-use crate::error::{Error, Result};
+use crate::error::Result;
 
 mod inference;
 mod cast;

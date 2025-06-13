@@ -118,6 +118,15 @@ pub enum IRValue {
     Assignment { name: String, value: Box<IRValue> },
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum IRConstant {
+    Integer(i64),
+    Float(f64),
+    String(String),
+    Boolean(bool),
+    Unit,
+}
+
 impl fmt::Display for IR {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for func in &self.functions {

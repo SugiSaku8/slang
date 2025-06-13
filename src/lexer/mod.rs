@@ -4,7 +4,7 @@ use std::ops::Range;
 #[derive(Logos, Debug, PartialEq, Clone)]
 pub enum Token {
     // 識別子
-    #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*")]
+    #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", priority = 2)]
     Identifier(String),
 
     // リテラル
@@ -125,7 +125,7 @@ pub enum Token {
     #[token("=>")]
     FatArrow,
 
-    #[token("_")]
+    #[token("_", priority = 3)]
     Underscore,
 
     // 優先所有格関連
@@ -158,9 +158,6 @@ pub enum Token {
     Percent,
 
     // エラー
-    #[error]
-    Error,
-
     #[token("+")]
     Plus,
 
