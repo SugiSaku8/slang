@@ -142,7 +142,7 @@ impl TypeInference {
                 self.infer_binary_operation(&op.op, left_type, right_type)
             }
             Expression::UnaryOp(op) => {
-                let expr_type = self.infer_expression(&op.expr)?;
+                let expr_type = self.infer_expression(&op.right)?;
                 self.infer_unary_operation(&op.op, expr_type)
             }
             Expression::Call(call) => {

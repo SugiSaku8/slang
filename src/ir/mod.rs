@@ -235,4 +235,10 @@ impl fmt::Display for IRUnaryOperator {
             Negate => "-",
         })
     }
+}
+
+impl fmt::Display for IRGlobal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "global {}: {} = {}", self.name, self.type_annotation, self.value)
+    }
 } 
