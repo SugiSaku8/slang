@@ -1,4 +1,5 @@
 use logos::{Logos, Span};
+use std::ops::Range;
 use crate::error::Result;
 
 #[derive(Logos, Debug, PartialEq, Clone)]
@@ -22,7 +23,7 @@ pub enum Token {
 
     // キーワード
     #[token("fn")]
-    Fn,
+    Function,
 
     #[token("let")]
     Let,
@@ -33,17 +34,29 @@ pub enum Token {
     #[token("else")]
     Else,
 
-    #[token("match")]
-    Match,
-
     #[token("while")]
     While,
 
     #[token("for")]
     For,
 
+    #[token("in")]
+    In,
+
     #[token("return")]
     Return,
+
+    #[token("match")]
+    Match,
+
+    #[token("type")]
+    Type,
+
+    #[token("priority")]
+    Priority,
+
+    #[token("most_high")]
+    MostHigh,
 
     // 演算子
     #[token("+")]
@@ -74,10 +87,10 @@ pub enum Token {
     GreaterThan,
 
     #[token("<=")]
-    LessEquals,
+    LessThanEquals,
 
     #[token(">=")]
-    GreaterEquals,
+    GreaterThanEquals,
 
     // 区切り文字
     #[token("(")]
@@ -97,6 +110,9 @@ pub enum Token {
 
     #[token("]")]
     RightBracket,
+
+    #[token(":")]
+    Colon,
 
     #[token(";")]
     Semicolon,
@@ -120,29 +136,41 @@ pub enum Token {
     #[token("Macro:type:")]
     MacroType,
 
+    #[regex(r"//[^\n]*")]
+    Comment,
+
+    #[regex(r"[ \t\n\f]+")]
+    Whitespace,
+
+    // 論理演算子
+    #[token("&&")]
+    And,
+
+    #[token("||")]
+    Or,
+
+    #[token("!")]
+    Not,
+
     // エラー
     #[error]
-    #[regex(r"[ \t\n\f]+", logos::skip)]
     Error,
 }
 
 pub struct Lexer<'a> {
     source: &'a str,
-    tokens: Vec<(Token, Span)>,
+    tokens: Vec<(Token, Range<usize>)>,
     current: usize,
 }
 
 impl<'a> Lexer<'a> {
     pub fn new(source: &'a str) -> Result<Self> {
-        let mut lex = logos::Lexer::<Token>::new(source);
+        let mut lexer = Token::lexer(source);
         let mut tokens = Vec::new();
 
-        while let Some(token) = lex.next() {
-            match token {
-                Ok(token) => tokens.push((token, lex.span())),
-                Err(_) => return Err(crate::error::SlangError::Lexical(
-                    format!("Invalid token at position {}", lex.span().start)
-                )),
+        while let Some(token) = lexer.next() {
+            if token != Token::Whitespace && token != Token::Comment {
+                tokens.push((token, lexer.span()));
             }
         }
 
@@ -153,17 +181,23 @@ impl<'a> Lexer<'a> {
         })
     }
 
+    pub fn tokenize(&mut self) -> Result<Vec<(Token, Range<usize>)>, String> {
+        Ok(self.tokens.clone())
+    }
+
     pub fn peek(&self) -> Option<&Token> {
         self.tokens.get(self.current).map(|(token, _)| token)
     }
 
     pub fn next(&mut self) -> Option<&Token> {
         let token = self.peek();
-        self.current += 1;
+        if token.is_some() {
+            self.current += 1;
+        }
         token
     }
 
-    pub fn span(&self) -> Option<Span> {
-        self.tokens.get(self.current).map(|(_, span)| *span)
+    pub fn current_span(&self) -> Option<Range<usize>> {
+        self.tokens.get(self.current).map(|(_, span)| span.clone())
     }
 } 
