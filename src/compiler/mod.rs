@@ -76,11 +76,11 @@ impl Compiler {
         match expression {
             Expression::Literal(lit) => {
                 match lit {
-                    Literal::Int(i) => Ok(IRValue::Constant(IRConstant::Integer(*i))),
-                    Literal::Float(f) => Ok(IRValue::Constant(IRConstant::Float(*f))),
-                    Literal::String(s) => Ok(IRValue::Constant(IRConstant::String(s.clone()))),
-                    Literal::Bool(b) => Ok(IRValue::Constant(IRConstant::Boolean(*b))),
-                    Literal::Null => Ok(IRValue::Constant(IRConstant::Unit)),
+                    Literal::Int(i) => Ok(IRValue::Int(*i)),
+                    Literal::Float(f) => Ok(IRValue::Float(*f)),
+                    Literal::String(s) => Ok(IRValue::String(s.clone())),
+                    Literal::Bool(b) => Ok(IRValue::Bool(*b)),
+                    Literal::Null => Ok(IRValue::Null),
                 }
             }
             Expression::BinaryOp(expr) => {
