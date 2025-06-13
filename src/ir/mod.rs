@@ -1,7 +1,7 @@
 use crate::type_system::Type;
 use std::fmt;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct IR {
     pub functions: Vec<IRFunction>,
     pub globals: Vec<IRGlobal>,
@@ -15,8 +15,8 @@ impl IR {
         }
     }
 
-    pub fn add_function(&mut self, function: IRFunction) {
-        self.functions.push(function);
+    pub fn add_function(&mut self, func: IRFunction) {
+        self.functions.push(func);
     }
 
     pub fn add_global(&mut self, global: IRGlobal) {
@@ -24,7 +24,7 @@ impl IR {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct IRFunction {
     pub name: String,
     pub parameters: Vec<IRParameter>,
@@ -33,83 +33,81 @@ pub struct IRFunction {
     pub blocks: Vec<IRBlock>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct IRParameter {
     pub name: String,
     pub type_annotation: Type,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct IRGlobal {
     pub name: String,
     pub type_annotation: Type,
     pub value: IRValue,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct IRBlock {
     pub label: String,
     pub instructions: Vec<IRInstruction>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum IRInstruction {
-    Alloca(String, Type),
-    Store(String, IRValue),
-    Load(String, String),
-    BinaryOp(String, IRBinaryOperator, IRValue, IRValue),
-    UnaryOp(String, IRUnaryOperator, IRValue),
-    Call(String, String, Vec<IRValue>),
+    Alloca { name: String, type_annotation: Type },
+    Store { name: String, value: IRValue },
+    Load { name: String },
+    BinaryOp { dest: String, op: IRBinaryOperator, left: IRValue, right: IRValue },
+    UnaryOp { dest: String, op: IRUnaryOperator, expr: IRValue },
+    Call { dest: String, function: String, arguments: Vec<IRValue> },
     Return(Option<IRValue>),
-    Branch(String),
-    ConditionalBranch(IRValue, String, String),
+    Branch { label: String },
+    ConditionalBranch { condition: IRValue, then_label: String, else_label: String },
+    Assignment { target: String, value: IRValue },
+    Expression(IRValue),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum IRBinaryOperator {
     Add,
-    Subtract,
-    Multiply,
-    Divide,
-    Modulo,
-    Equals,
-    NotEquals,
-    LessThan,
-    GreaterThan,
-    LessThanEquals,
-    GreaterThanEquals,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    Eq,
+    Neq,
+    Lt,
+    Lte,
+    Gt,
+    Gte,
     And,
     Or,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum IRUnaryOperator {
-    Negate,
+    Neg,
     Not,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum IRValue {
-    Constant(IRConstant),
-    Variable(String),
-}
-
-#[derive(Debug, Clone)]
-pub enum IRConstant {
-    Integer(i64),
+    Int(i64),
     Float(f64),
+    Bool(bool),
     String(String),
-    Boolean(bool),
     Null,
+    Identifier(String),
+    // 変数や関数呼び出しなどの値
 }
 
 impl fmt::Display for IR {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for func in &self.functions {
+            writeln!(f, "{}", func)?;
+        }
         for global in &self.globals {
             writeln!(f, "{}", global)?;
-        }
-        for function in &self.functions {
-            writeln!(f, "{}", function)?;
         }
         Ok(())
     }
@@ -117,18 +115,11 @@ impl fmt::Display for IR {
 
 impl fmt::Display for IRFunction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "fn {}(", self.name)?;
-        for (i, param) in self.parameters.iter().enumerate() {
-            if i > 0 {
-                write!(f, ", ")?;
-            }
-            write!(f, "{}", param)?;
-        }
-        writeln!(f, ") -> {} {{", self.return_type)?;
+        write!(f, "fn {}({}) -> {} [priority: {}] {{\n", self.name, self.parameters.iter().map(|p| p.to_string()).collect::<Vec<_>>().join(", "), self.return_type, self.priority)?;
         for block in &self.blocks {
-            writeln!(f, "{}", block)?;
+            writeln!(f, "  {}", block)?;
         }
-        writeln!(f, "}}")
+        write!(f, "}}")
     }
 }
 
@@ -138,17 +129,11 @@ impl fmt::Display for IRParameter {
     }
 }
 
-impl fmt::Display for IRGlobal {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "global {}: {} = {}", self.name, self.type_annotation, self.value)
-    }
-}
-
 impl fmt::Display for IRBlock {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "{}:", self.label)?;
-        for instruction in &self.instructions {
-            writeln!(f, "    {}", instruction)?;
+        write!(f, "{}: ", self.label)?;
+        for instr in &self.instructions {
+            writeln!(f, "    {}", instr)?;
         }
         Ok(())
     }
@@ -157,73 +142,18 @@ impl fmt::Display for IRBlock {
 impl fmt::Display for IRInstruction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            IRInstruction::Alloca(name, type_) => {
-                writeln!(f, "{} = alloca {}", name, type_)
-            }
-            IRInstruction::Store(name, value) => {
-                writeln!(f, "store {} = {}", name, value)
-            }
-            IRInstruction::Load(dest, src) => {
-                writeln!(f, "{} = load {}", dest, src)
-            }
-            IRInstruction::BinaryOp(dest, op, left, right) => {
-                writeln!(f, "{} = {} {} {}", dest, op, left, right)
-            }
-            IRInstruction::UnaryOp(dest, op, expr) => {
-                writeln!(f, "{} = {} {}", dest, op, expr)
-            }
-            IRInstruction::Call(dest, function, args) => {
-                write!(f, "{} = call {}(", dest, function)?;
-                for (i, arg) in args.iter().enumerate() {
-                    if i > 0 {
-                        write!(f, ", ")?;
-                    }
-                    write!(f, "{}", arg)?;
-                }
-                writeln!(f, ")")
-            }
-            IRInstruction::Return(value) => {
-                if let Some(value) = value {
-                    writeln!(f, "return {}", value)
-                } else {
-                    writeln!(f, "return")
-                }
-            }
-            IRInstruction::Branch(label) => {
-                writeln!(f, "br {}", label)
-            }
-            IRInstruction::ConditionalBranch(cond, true_label, false_label) => {
-                writeln!(f, "br {} {}, {}", cond, true_label, false_label)
-            }
-        }
-    }
-}
-
-impl fmt::Display for IRBinaryOperator {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            IRBinaryOperator::Add => write!(f, "add"),
-            IRBinaryOperator::Subtract => write!(f, "sub"),
-            IRBinaryOperator::Multiply => write!(f, "mul"),
-            IRBinaryOperator::Divide => write!(f, "div"),
-            IRBinaryOperator::Modulo => write!(f, "mod"),
-            IRBinaryOperator::Equals => write!(f, "eq"),
-            IRBinaryOperator::NotEquals => write!(f, "ne"),
-            IRBinaryOperator::LessThan => write!(f, "lt"),
-            IRBinaryOperator::GreaterThan => write!(f, "gt"),
-            IRBinaryOperator::LessThanEquals => write!(f, "le"),
-            IRBinaryOperator::GreaterThanEquals => write!(f, "ge"),
-            IRBinaryOperator::And => write!(f, "and"),
-            IRBinaryOperator::Or => write!(f, "or"),
-        }
-    }
-}
-
-impl fmt::Display for IRUnaryOperator {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            IRUnaryOperator::Negate => write!(f, "neg"),
-            IRUnaryOperator::Not => write!(f, "not"),
+            IRInstruction::Alloca { name, type_annotation } => write!(f, "alloca {}: {}", name, type_annotation),
+            IRInstruction::Store { name, value } => write!(f, "store {}, {}", name, value),
+            IRInstruction::Load { name } => write!(f, "load {}", name),
+            IRInstruction::BinaryOp { dest, op, left, right } => write!(f, "{} = {} {} {}", dest, left, op, right),
+            IRInstruction::UnaryOp { dest, op, expr } => write!(f, "{} = {} {}", dest, op, expr),
+            IRInstruction::Call { dest, function, arguments } => write!(f, "{} = call {}({})", dest, function, arguments.iter().map(|a| a.to_string()).collect::<Vec<_>>().join(", ")),
+            IRInstruction::Return(Some(value)) => write!(f, "return {}", value),
+            IRInstruction::Return(None) => write!(f, "return"),
+            IRInstruction::Branch { label } => write!(f, "br {}", label),
+            IRInstruction::ConditionalBranch { condition, then_label, else_label } => write!(f, "br_if {} {} {}", condition, then_label, else_label),
+            IRInstruction::Assignment { target, value } => write!(f, "{} = {}", target, value),
+            IRInstruction::Expression(value) => write!(f, "expr {}", value),
         }
     }
 }
@@ -231,20 +161,43 @@ impl fmt::Display for IRUnaryOperator {
 impl fmt::Display for IRValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            IRValue::Constant(constant) => write!(f, "{}", constant),
-            IRValue::Variable(name) => write!(f, "{}", name),
+            IRValue::Int(i) => write!(f, "{}", i),
+            IRValue::Float(fl) => write!(f, "{}", fl),
+            IRValue::Bool(b) => write!(f, "{}", b),
+            IRValue::String(s) => write!(f, "\"{}\"", s),
+            IRValue::Null => write!(f, "null"),
+            IRValue::Identifier(name) => write!(f, "{}", name),
         }
     }
 }
 
-impl fmt::Display for IRConstant {
+impl fmt::Display for IRBinaryOperator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            IRConstant::Integer(i) => write!(f, "{}", i),
-            IRConstant::Float(fl) => write!(f, "{}", fl),
-            IRConstant::String(s) => write!(f, "\"{}\"", s),
-            IRConstant::Boolean(b) => write!(f, "{}", b),
-            IRConstant::Null => write!(f, "null"),
-        }
+        use IRBinaryOperator::*;
+        write!(f, "{}", match self {
+            Add => "+",
+            Sub => "-",
+            Mul => "*",
+            Div => "/",
+            Mod => "%",
+            Eq => "==",
+            Neq => "!=",
+            Lt => "<",
+            Lte => "<=",
+            Gt => ">",
+            Gte => ">=",
+            And => "&&",
+            Or => "||",
+        })
+    }
+}
+
+impl fmt::Display for IRUnaryOperator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use IRUnaryOperator::*;
+        write!(f, "{}", match self {
+            Neg => "-",
+            Not => "!",
+        })
     }
 } 

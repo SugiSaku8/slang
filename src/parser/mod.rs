@@ -48,17 +48,17 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_parameters(&mut self) -> Result<Vec<Parameter>> {
-        self.expect(Token::LeftParen)?;
+        self.expect(Token::LParen)?;
         let mut parameters = Vec::new();
         if let Some(token) = self.peek() {
-            if token != &Token::RightParen {
+            if token != &Token::RParen {
                 loop {
                     let name = self.parse_identifier()?;
                     self.expect(Token::Colon)?;
                     let type_ = self.parse_type()?;
                     parameters.push(Parameter { name, type_ });
                     if let Some(token) = self.peek() {
-                        if token == &Token::RightParen {
+                        if token == &Token::RParen {
                             break;
                         }
                         self.expect(Token::Comma)?;
@@ -68,7 +68,7 @@ impl<'a> Parser<'a> {
                 }
             }
         }
-        self.expect(Token::RightParen)?;
+        self.expect(Token::RParen)?;
         Ok(parameters)
     }
 
@@ -114,7 +114,7 @@ impl<'a> Parser<'a> {
         Ok(priorities)
     }
 
-    fn parse_block(&mut self) -> Result<Vec<Statement>> {
+    fn parse_block(&mut self) -> Result<Block> {
         self.expect(Token::LeftBrace)?;
         let mut statements = Vec::new();
         while let Some(token) = self.peek() {
@@ -124,7 +124,7 @@ impl<'a> Parser<'a> {
             statements.push(self.parse_statement()?);
         }
         self.expect(Token::RightBrace)?;
-        Ok(statements)
+        Ok(Block { statements })
     }
 
     fn parse_statement(&mut self) -> Result<Statement> {
@@ -145,9 +145,9 @@ impl<'a> Parser<'a> {
             }
             Some(Token::If) => {
                 self.next();
-                self.expect(Token::LeftParen)?;
+                self.expect(Token::LParen)?;
                 let condition = self.parse_expression()?;
-                self.expect(Token::RightParen)?;
+                self.expect(Token::RParen)?;
                 let then_branch = self.parse_block()?;
                 let else_branch = if let Some(token) = self.peek() {
                     if token == &Token::Else {
@@ -167,19 +167,19 @@ impl<'a> Parser<'a> {
             }
             Some(Token::While) => {
                 self.next();
-                self.expect(Token::LeftParen)?;
+                self.expect(Token::LParen)?;
                 let condition = self.parse_expression()?;
-                self.expect(Token::RightParen)?;
+                self.expect(Token::RParen)?;
                 let body = self.parse_block()?;
                 Ok(Statement::While(WhileStatement { condition, body }))
             }
             Some(Token::For) => {
                 self.next();
-                self.expect(Token::LeftParen)?;
+                self.expect(Token::LParen)?;
                 let pattern = self.parse_pattern()?;
                 self.expect(Token::In)?;
                 let iterable = self.parse_expression()?;
-                self.expect(Token::RightParen)?;
+                self.expect(Token::RParen)?;
                 let body = self.parse_block()?;
                 Ok(Statement::For(ForStatement {
                     pattern,
@@ -323,7 +323,7 @@ impl<'a> Parser<'a> {
                     let right = self.parse_factor()?;
                     expr = Expression::BinaryOp(BinaryOpExpression {
                         left: Box::new(expr),
-                        op: BinaryOperator::Subtract,
+                        op: BinaryOperator::Sub,
                         right: Box::new(right),
                     });
                 }
@@ -342,7 +342,7 @@ impl<'a> Parser<'a> {
                     let right = self.parse_unary()?;
                     expr = Expression::BinaryOp(BinaryOpExpression {
                         left: Box::new(expr),
-                        op: BinaryOperator::Multiply,
+                        op: BinaryOperator::Mul,
                         right: Box::new(right),
                     });
                 }
@@ -377,7 +377,7 @@ impl<'a> Parser<'a> {
                     self.next();
                     let expr = self.parse_unary()?;
                     Ok(Expression::UnaryOp(UnaryOpExpression {
-                        op: UnaryOperator::Negate,
+                        op: UnaryOperator::Neg,
                         expr: Box::new(expr),
                     }))
                 }
@@ -401,15 +401,15 @@ impl<'a> Parser<'a> {
             Some(Token::Identifier(name)) => {
                 self.next();
                 if let Some(token) = self.peek() {
-                    if token == &Token::LeftParen {
+                    if token == &Token::LParen {
                         self.next();
                         let mut arguments = Vec::new();
                         if let Some(token) = self.peek() {
-                            if token != &Token::RightParen {
+                            if token != &Token::RParen {
                                 loop {
                                     arguments.push(self.parse_expression()?);
                                     if let Some(token) = self.peek() {
-                                        if token == &Token::RightParen {
+                                        if token == &Token::RParen {
                                             break;
                                         }
                                         self.expect(Token::Comma)?;
@@ -419,7 +419,7 @@ impl<'a> Parser<'a> {
                                 }
                             }
                         }
-                        self.expect(Token::RightParen)?;
+                        self.expect(Token::RParen)?;
                         Ok(Expression::Call(CallExpression {
                             function: name.clone(),
                             arguments,
@@ -437,16 +437,16 @@ impl<'a> Parser<'a> {
             }
             Some(Token::IntegerLiteral(value)) => {
                 self.next();
-                Ok(Expression::Literal(Literal::Integer(*value)))
+                Ok(Expression::Literal(Literal::Int(*value)))
             }
             Some(Token::FloatLiteral(value)) => {
                 self.next();
                 Ok(Expression::Literal(Literal::Float(*value)))
             }
-            Some(Token::LeftParen) => {
+            Some(Token::LParen) => {
                 self.next();
                 let expr = self.parse_expression()?;
-                self.expect(Token::RightParen)?;
+                self.expect(Token::RParen)?;
                 Ok(expr)
             }
             _ => Err(SlangError::Syntax(format!("Unexpected token: {:?}", self.peek()))),
@@ -465,15 +465,15 @@ impl<'a> Parser<'a> {
                 self.expect(Token::RightBracket)?;
                 Ok(Type::Array(element_type))
             }
-            Some(Token::LeftParen) => {
+            Some(Token::LParen) => {
                 self.next();
                 let mut types = Vec::new();
                 if let Some(token) = self.peek() {
-                    if token != &Token::RightParen {
+                    if token != &Token::RParen {
                         loop {
                             types.push(self.parse_type()?);
                             if let Some(token) = self.peek() {
-                                if token == &Token::RightParen {
+                                if token == &Token::RParen {
                                     break;
                                 }
                                 self.expect(Token::Comma)?;
@@ -483,7 +483,7 @@ impl<'a> Parser<'a> {
                         }
                     }
                 }
-                self.expect(Token::RightParen)?;
+                self.expect(Token::RParen)?;
                 Ok(Type::Tuple(types))
             }
             _ => Err(SlangError::Syntax(format!("Unexpected token in type: {:?}", self.peek()))),
@@ -509,15 +509,15 @@ impl<'a> Parser<'a> {
                 self.next();
                 Ok(Pattern::Wildcard)
             }
-            Some(Token::LeftParen) => {
+            Some(Token::LParen) => {
                 self.next();
                 let mut patterns = Vec::new();
                 if let Some(token) = self.peek() {
-                    if token != &Token::RightParen {
+                    if token != &Token::RParen {
                         loop {
                             patterns.push(self.parse_pattern()?);
                             if let Some(token) = self.peek() {
-                                if token == &Token::RightParen {
+                                if token == &Token::RParen {
                                     break;
                                 }
                                 self.expect(Token::Comma)?;
@@ -527,7 +527,7 @@ impl<'a> Parser<'a> {
                         }
                     }
                 }
-                self.expect(Token::RightParen)?;
+                self.expect(Token::RParen)?;
                 Ok(Pattern::Tuple(patterns))
             }
             _ => Err(SlangError::Syntax(format!("Unexpected token in pattern: {:?}", self.peek()))),
