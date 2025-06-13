@@ -9,7 +9,7 @@ pub struct AST {
 
 impl AST {
     pub fn new() -> Self {
-        AST {
+        Self {
             functions: Vec::new(),
             type_definitions: Vec::new(),
         }
@@ -19,8 +19,8 @@ impl AST {
         self.functions.push(function);
     }
 
-    pub fn add_type_definition(&mut self, type_def: TypeDefinition) {
-        self.type_definitions.push(type_def);
+    pub fn add_type_definition(&mut self, type_definition: TypeDefinition) {
+        self.type_definitions.push(type_definition);
     }
 }
 
@@ -43,7 +43,7 @@ pub struct Function {
     pub name: String,
     pub parameters: Vec<Parameter>,
     pub return_type: Type,
-    pub priority: Vec<i32>,
+    pub priority: i32,
     pub body: Vec<Statement>,
 }
 
@@ -56,50 +56,61 @@ pub struct Parameter {
 #[derive(Debug, Clone)]
 pub struct TypeDefinition {
     pub name: String,
-    pub type_: Type,
+    pub fields: Vec<Field>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Field {
+    pub name: String,
+    pub type_annotation: Type,
 }
 
 #[derive(Debug, Clone)]
 pub enum Statement {
     Let(LetStatement),
-    Return(Expression),
+    Return(ReturnStatement),
     If(IfStatement),
     While(WhileStatement),
     For(ForStatement),
     Match(MatchStatement),
-    Expression(Expression),
+    Expression(Box<Expression>),
 }
 
 #[derive(Debug, Clone)]
 pub struct LetStatement {
     pub name: String,
+    pub value: Box<Expression>,
     pub type_annotation: Option<Type>,
-    pub value: Expression,
+}
+
+#[derive(Debug, Clone)]
+pub struct ReturnStatement {
+    pub value: Option<Box<Expression>>,
 }
 
 #[derive(Debug, Clone)]
 pub struct IfStatement {
-    pub condition: Expression,
+    pub condition: Box<Expression>,
     pub then_branch: Vec<Statement>,
     pub else_branch: Option<Vec<Statement>>,
 }
 
 #[derive(Debug, Clone)]
 pub struct WhileStatement {
-    pub condition: Expression,
+    pub condition: Box<Expression>,
     pub body: Vec<Statement>,
 }
 
 #[derive(Debug, Clone)]
 pub struct ForStatement {
     pub variable: String,
-    pub iterator: Expression,
+    pub iterator: Box<Expression>,
     pub body: Vec<Statement>,
 }
 
 #[derive(Debug, Clone)]
 pub struct MatchStatement {
-    pub value: Expression,
+    pub expression: Box<Expression>,
     pub arms: Vec<MatchArm>,
 }
 
@@ -111,8 +122,17 @@ pub struct MatchArm {
 
 #[derive(Debug, Clone)]
 pub enum Pattern {
+    Literal(Literal),
     Identifier(String),
     Tuple(Vec<Pattern>),
+    Struct(String, Vec<FieldPattern>),
+    Wildcard,
+}
+
+#[derive(Debug, Clone)]
+pub struct FieldPattern {
+    pub name: String,
+    pub pattern: Box<Pattern>,
 }
 
 #[derive(Debug, Clone)]
@@ -131,6 +151,7 @@ pub enum Literal {
     Float(f64),
     String(String),
     Boolean(bool),
+    Null,
 }
 
 #[derive(Debug, Clone)]
@@ -153,6 +174,8 @@ pub enum BinaryOperator {
     GreaterThan,
     LessThanEquals,
     GreaterThanEquals,
+    And,
+    Or,
 }
 
 #[derive(Debug, Clone)]
@@ -170,13 +193,13 @@ pub enum UnaryOperator {
 #[derive(Debug, Clone)]
 pub struct CallExpression {
     pub function: String,
-    pub arguments: Vec<Expression>,
+    pub arguments: Vec<Box<Expression>>,
 }
 
 #[derive(Debug, Clone)]
 pub struct AssignmentExpression {
-    pub target: Expression,
-    pub value: Expression,
+    pub target: String,
+    pub value: Box<Expression>,
 }
 
 #[derive(Debug, Clone)]
@@ -273,6 +296,268 @@ impl fmt::Display for Item {
             Item::Trait(trait_) => write!(f, "{}", trait_),
             Item::Module(module) => write!(f, "{}", module),
             Item::Macro(macro_) => write!(f, "{}", macro_),
+        }
+    }
+}
+
+impl fmt::Display for AST {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for function in &self.functions {
+            writeln!(f, "{}", function)?;
+        }
+        for type_def in &self.type_definitions {
+            writeln!(f, "{}", type_def)?;
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Display for Function {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "fn {}(", self.name)?;
+        for (i, param) in self.parameters.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}", param)?;
+        }
+        writeln!(f, ") -> {} {{", self.return_type)?;
+        for stmt in &self.body {
+            writeln!(f, "    {}", stmt)?;
+        }
+        writeln!(f, "}}")
+    }
+}
+
+impl fmt::Display for Parameter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}: {}", self.name, self.type_annotation)
+    }
+}
+
+impl fmt::Display for TypeDefinition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "type {} {{", self.name)?;
+        for field in &self.fields {
+            writeln!(f, "    {}", field)?;
+        }
+        writeln!(f, "}}")
+    }
+}
+
+impl fmt::Display for Field {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}: {}", self.name, self.type_annotation)
+    }
+}
+
+impl fmt::Display for Statement {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Statement::Let(stmt) => write!(f, "{}", stmt),
+            Statement::Return(stmt) => write!(f, "{}", stmt),
+            Statement::If(stmt) => write!(f, "{}", stmt),
+            Statement::While(stmt) => write!(f, "{}", stmt),
+            Statement::For(stmt) => write!(f, "{}", stmt),
+            Statement::Match(stmt) => write!(f, "{}", stmt),
+            Statement::Expression(expr) => write!(f, "{}", expr),
+        }
+    }
+}
+
+impl fmt::Display for LetStatement {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "let {}", self.name)?;
+        if let Some(type_) = &self.type_annotation {
+            write!(f, ": {}", type_)?;
+        }
+        writeln!(f, " = {};", self.value)
+    }
+}
+
+impl fmt::Display for ReturnStatement {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(value) = &self.value {
+            writeln!(f, "return {};", value)
+        } else {
+            writeln!(f, "return;")
+        }
+    }
+}
+
+impl fmt::Display for IfStatement {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "if {} {{", self.condition)?;
+        for stmt in &self.then_branch {
+            writeln!(f, "    {}", stmt)?;
+        }
+        if let Some(else_branch) = &self.else_branch {
+            writeln!(f, "}} else {{")?;
+            for stmt in else_branch {
+                writeln!(f, "    {}", stmt)?;
+            }
+        }
+        writeln!(f, "}}")
+    }
+}
+
+impl fmt::Display for WhileStatement {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "while {} {{", self.condition)?;
+        for stmt in &self.body {
+            writeln!(f, "    {}", stmt)?;
+        }
+        writeln!(f, "}}")
+    }
+}
+
+impl fmt::Display for ForStatement {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "for {} in {} {{", self.variable, self.iterator)?;
+        for stmt in &self.body {
+            writeln!(f, "    {}", stmt)?;
+        }
+        writeln!(f, "}}")
+    }
+}
+
+impl fmt::Display for MatchStatement {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "match {} {{", self.expression)?;
+        for arm in &self.arms {
+            writeln!(f, "    {}", arm)?;
+        }
+        writeln!(f, "}}")
+    }
+}
+
+impl fmt::Display for MatchArm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "{} => {{", self.pattern)?;
+        for stmt in &self.body {
+            writeln!(f, "        {}", stmt)?;
+        }
+        writeln!(f, "    }},")
+    }
+}
+
+impl fmt::Display for Pattern {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Pattern::Literal(lit) => write!(f, "{}", lit),
+            Pattern::Identifier(name) => write!(f, "{}", name),
+            Pattern::Tuple(patterns) => {
+                write!(f, "(")?;
+                for (i, pattern) in patterns.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", pattern)?;
+                }
+                write!(f, ")")
+            }
+            Pattern::Struct(name, fields) => {
+                write!(f, "{} {{", name)?;
+                for (i, field) in fields.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", field)?;
+                }
+                write!(f, "}}")
+            }
+            Pattern::Wildcard => write!(f, "_"),
+        }
+    }
+}
+
+impl fmt::Display for FieldPattern {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}: {}", self.name, self.pattern)
+    }
+}
+
+impl fmt::Display for Expression {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Expression::Literal(lit) => write!(f, "{}", lit),
+            Expression::Identifier(name) => write!(f, "{}", name),
+            Expression::BinaryOp(expr) => write!(f, "{}", expr),
+            Expression::UnaryOp(expr) => write!(f, "{}", expr),
+            Expression::Call(expr) => write!(f, "{}", expr),
+            Expression::Assignment(expr) => write!(f, "{}", expr),
+        }
+    }
+}
+
+impl fmt::Display for BinaryOpExpression {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} {} {}", self.left, self.op, self.right)
+    }
+}
+
+impl fmt::Display for UnaryOpExpression {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}{}", self.op, self.right)
+    }
+}
+
+impl fmt::Display for CallExpression {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}(", self.function)?;
+        for (i, arg) in self.arguments.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}", arg)?;
+        }
+        write!(f, ")")
+    }
+}
+
+impl fmt::Display for AssignmentExpression {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} = {}", self.target, self.value)
+    }
+}
+
+impl fmt::Display for Literal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Literal::Integer(i) => write!(f, "{}", i),
+            Literal::Float(fl) => write!(f, "{}", fl),
+            Literal::String(s) => write!(f, "\"{}\"", s),
+            Literal::Boolean(b) => write!(f, "{}", b),
+            Literal::Null => write!(f, "null"),
+        }
+    }
+}
+
+impl fmt::Display for BinaryOperator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BinaryOperator::Add => write!(f, "+"),
+            BinaryOperator::Subtract => write!(f, "-"),
+            BinaryOperator::Multiply => write!(f, "*"),
+            BinaryOperator::Divide => write!(f, "/"),
+            BinaryOperator::Modulo => write!(f, "%"),
+            BinaryOperator::Equals => write!(f, "=="),
+            BinaryOperator::NotEquals => write!(f, "!="),
+            BinaryOperator::LessThan => write!(f, "<"),
+            BinaryOperator::GreaterThan => write!(f, ">"),
+            BinaryOperator::LessThanEquals => write!(f, "<="),
+            BinaryOperator::GreaterThanEquals => write!(f, ">="),
+            BinaryOperator::And => write!(f, "&&"),
+            BinaryOperator::Or => write!(f, "||"),
+        }
+    }
+}
+
+impl fmt::Display for UnaryOperator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            UnaryOperator::Negate => write!(f, "-"),
+            UnaryOperator::Not => write!(f, "!"),
         }
     }
 }
