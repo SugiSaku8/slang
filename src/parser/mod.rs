@@ -135,13 +135,13 @@ impl<'a> Parser<'a> {
                 self.expect(Token::Equals)?;
                 let value = self.parse_expression()?;
                 self.expect(Token::Semicolon)?;
-                Ok(Statement::Let(LetStatement { name, value }))
+                Ok(Statement::Let(LetStatement { name, type_annotation: None, value: Box::new(value) }))
             }
             Some(Token::Return) => {
                 self.next();
                 let value = self.parse_expression()?;
                 self.expect(Token::Semicolon)?;
-                Ok(Statement::Return(ReturnStatement { value }))
+                Ok(Statement::Return(ReturnStatement { value: Some(Box::new(value)) }))
             }
             Some(Token::If) => {
                 self.next();
@@ -207,7 +207,7 @@ impl<'a> Parser<'a> {
             _ => {
                 let expr = self.parse_expression()?;
                 self.expect(Token::Semicolon)?;
-                Ok(Statement::Expression(expr))
+                Ok(Statement::Expression(Box::new(expr)))
             }
         }
     }
@@ -376,18 +376,18 @@ impl<'a> Parser<'a> {
                 Token::Minus => {
                     self.next();
                     let expr = self.parse_unary()?;
-                    Ok(Expression::UnaryOp(UnaryOpExpression {
+                    Ok(Expression::UnaryOp(Box::new(UnaryOpExpression {
                         op: UnaryOperator::Neg,
-                        expr: Box::new(expr),
-                    }))
+                        right: Box::new(expr),
+                    })))
                 }
                 Token::Not => {
                     self.next();
                     let expr = self.parse_unary()?;
-                    Ok(Expression::UnaryOp(UnaryOpExpression {
+                    Ok(Expression::UnaryOp(Box::new(UnaryOpExpression {
                         op: UnaryOperator::Not,
-                        expr: Box::new(expr),
-                    }))
+                        right: Box::new(expr),
+                    })))
                 }
                 _ => self.parse_primary(),
             }
@@ -407,7 +407,7 @@ impl<'a> Parser<'a> {
                         if let Some(token) = self.peek() {
                             if token != &Token::RParen {
                                 loop {
-                                    arguments.push(self.parse_expression()?);
+                                    arguments.push(Box::new(self.parse_expression()?));
                                     if let Some(token) = self.peek() {
                                         if token == &Token::RParen {
                                             break;
@@ -420,10 +420,10 @@ impl<'a> Parser<'a> {
                             }
                         }
                         self.expect(Token::RParen)?;
-                        Ok(Expression::Call(CallExpression {
+                        Ok(Expression::Call(Box::new(CallExpression {
                             function: name.clone(),
                             arguments,
-                        }))
+                        })))
                     } else {
                         Ok(Expression::Identifier(name.clone()))
                     }
@@ -494,9 +494,9 @@ impl<'a> Parser<'a> {
         self.expect(Token::Type)?;
         let name = self.parse_identifier()?;
         self.expect(Token::Equals)?;
-        let type_ = self.parse_type()?;
+        let fields = vec![]; // TODO: parse fields properly
         self.expect(Token::Semicolon)?;
-        Ok(TypeDefinition { name, type_ })
+        Ok(TypeDefinition { name, fields })
     }
 
     fn parse_pattern(&mut self) -> Result<Pattern> {
