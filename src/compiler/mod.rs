@@ -1,7 +1,8 @@
-use crate::ir::*;
-use crate::parser::*;
-use crate::lexer::*;
 use crate::ast::*;
+use crate::error::{Result, SlangError};
+use crate::ir::*;
+use crate::lexer::Lexer;
+use crate::parser::Parser;
 
 pub struct Compiler {
     ast: AST,
@@ -10,98 +11,133 @@ pub struct Compiler {
 
 impl Compiler {
     pub fn new() -> Self {
-        Compiler {
+        Self {
             ast: AST::new(),
             ir: IR::new(),
         }
     }
 
-    pub fn compile(&mut self, source: &str) -> Result<IR, String> {
-        // 字句解析
+    pub fn compile(&mut self, source: &str) -> Result<IR> {
         let mut lexer = Lexer::new(source);
         let tokens = lexer.tokenize()?;
-
-        // 構文解析
-        let mut parser = Parser::new(&tokens);
+        let mut parser = Parser::new(&mut lexer);
         self.ast = parser.parse()?;
-
-        // IR生成
-        self.ir = self.generate_ir()?;
-
+        self.generate_ir()?;
         Ok(self.ir.clone())
     }
 
-    fn generate_ir(&self) -> Result<IR, String> {
-        let mut ir = IR::new();
-        
-        // ASTをIRに変換
+    fn generate_ir(&mut self) -> Result<()> {
         for function in &self.ast.functions {
             let ir_function = self.convert_function(function)?;
-            ir.add_function(ir_function);
+            self.ir.add_function(ir_function);
         }
-
-        Ok(ir)
+        Ok(())
     }
 
-    fn convert_function(&self, function: &Function) -> Result<IRFunction, String> {
-        let mut ir_function = IRFunction::new(
-            function.name.clone(),
-            function.return_type.clone(),
-            function.priority.clone(),
-        );
+    fn convert_function(&self, function: &Function) -> Result<IRFunction> {
+        let mut ir_function = IRFunction {
+            name: function.name.clone(),
+            parameters: function
+                .parameters
+                .iter()
+                .map(|p| IRParameter {
+                    name: p.name.clone(),
+                    type_: p.type_.clone(),
+                })
+                .collect(),
+            return_type: function.return_type.clone(),
+            blocks: vec![IRBlock {
+                name: "entry".to_string(),
+                instructions: Vec::new(),
+            }],
+        };
 
-        // パラメータの変換
-        for param in &function.parameters {
-            ir_function.add_parameter(param.name.clone(), param.type_annotation.clone());
-        }
-
-        // 本体の変換
         for statement in &function.body {
-            let ir_statement = self.convert_statement(statement)?;
-            ir_function.add_statement(ir_statement);
+            let instruction = self.convert_statement(statement)?;
+            ir_function.blocks[0].instructions.push(instruction);
         }
 
         Ok(ir_function)
     }
 
-    fn convert_statement(&self, statement: &Statement) -> Result<IRStatement, String> {
+    fn convert_statement(&self, statement: &Statement) -> Result<IRInstruction> {
         match statement {
-            Statement::Let(let_stmt) => {
-                let value = self.convert_expression(&let_stmt.value)?;
-                Ok(IRStatement::Let {
-                    name: let_stmt.name.clone(),
-                    type_annotation: let_stmt.type_annotation.clone(),
+            Statement::Let(LetStatement { name, value }) => {
+                let value = self.convert_expression(value)?;
+                Ok(IRInstruction::Let {
+                    name: name.clone(),
                     value,
                 })
             }
-            Statement::Return(expr) => {
-                let value = self.convert_expression(expr)?;
-                Ok(IRStatement::Return(value))
+            Statement::Return(ReturnStatement { value }) => {
+                let value = self.convert_expression(value)?;
+                Ok(IRInstruction::Return(value))
             }
             Statement::Expression(expr) => {
                 let value = self.convert_expression(expr)?;
-                Ok(IRStatement::Expression(value))
+                Ok(IRInstruction::Expression(value))
             }
-            // 他の文の変換も実装
-            _ => Err("Unsupported statement type".to_string()),
+            _ => Err(SlangError::Compilation("Unsupported statement".to_string())),
         }
     }
 
-    fn convert_expression(&self, expression: &Expression) -> Result<IRExpression, String> {
+    fn convert_expression(&self, expression: &Expression) -> Result<IRValue> {
         match expression {
-            Expression::Literal(lit) => Ok(IRExpression::Literal(lit.clone())),
-            Expression::Identifier(name) => Ok(IRExpression::Identifier(name.clone())),
-            Expression::BinaryOp { left, op, right } => {
-                let left_ir = self.convert_expression(left)?;
-                let right_ir = self.convert_expression(right)?;
-                Ok(IRExpression::BinaryOp {
-                    left: Box::new(left_ir),
-                    op: op.clone(),
-                    right: Box::new(right_ir),
+            Expression::Literal(lit) => Ok(IRValue::Constant(match lit {
+                Literal::Integer(i) => IRConstant::Integer(*i),
+                Literal::Float(f) => IRConstant::Float(*f),
+                Literal::String(s) => IRConstant::String(s.clone()),
+                Literal::Boolean(b) => IRConstant::Boolean(*b),
+            })),
+            Expression::Identifier(name) => Ok(IRValue::Variable(name.clone())),
+            Expression::BinaryOp(BinaryOpExpression { left, op, right }) => {
+                let left = self.convert_expression(left)?;
+                let right = self.convert_expression(right)?;
+                Ok(IRValue::BinaryOp {
+                    left: Box::new(left),
+                    op: match op {
+                        BinaryOperator::Add => IRBinaryOperator::Add,
+                        BinaryOperator::Subtract => IRBinaryOperator::Subtract,
+                        BinaryOperator::Multiply => IRBinaryOperator::Multiply,
+                        BinaryOperator::Divide => IRBinaryOperator::Divide,
+                        BinaryOperator::Modulo => IRBinaryOperator::Modulo,
+                        BinaryOperator::Equals => IRBinaryOperator::Equals,
+                        BinaryOperator::NotEquals => IRBinaryOperator::NotEquals,
+                        BinaryOperator::LessThan => IRBinaryOperator::LessThan,
+                        BinaryOperator::GreaterThan => IRBinaryOperator::GreaterThan,
+                        BinaryOperator::LessThanEquals => IRBinaryOperator::LessThanEquals,
+                        BinaryOperator::GreaterThanEquals => IRBinaryOperator::GreaterThanEquals,
+                    },
+                    right: Box::new(right),
                 })
             }
-            // 他の式の変換も実装
-            _ => Err("Unsupported expression type".to_string()),
+            Expression::UnaryOp(UnaryOpExpression { op, expr }) => {
+                let expr = self.convert_expression(expr)?;
+                Ok(IRValue::UnaryOp {
+                    op: match op {
+                        UnaryOperator::Negate => IRUnaryOperator::Negate,
+                        UnaryOperator::Not => IRUnaryOperator::Not,
+                    },
+                    expr: Box::new(expr),
+                })
+            }
+            Expression::Call(CallExpression { function, arguments }) => {
+                let args = arguments
+                    .iter()
+                    .map(|arg| self.convert_expression(arg))
+                    .collect::<Result<Vec<_>>>()?;
+                Ok(IRValue::Call {
+                    function: function.clone(),
+                    arguments: args,
+                })
+            }
+            Expression::Assignment(AssignmentExpression { name, value }) => {
+                let value = self.convert_expression(value)?;
+                Ok(IRValue::Assignment {
+                    name: name.clone(),
+                    value: Box::new(value),
+                })
+            }
         }
     }
 } 

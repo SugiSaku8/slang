@@ -1,6 +1,5 @@
 use logos::{Logos, Span};
 use std::ops::Range;
-use crate::error::Result;
 
 #[derive(Logos, Debug, PartialEq, Clone)]
 pub enum Token {
@@ -164,25 +163,21 @@ pub struct Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-    pub fn new(source: &'a str) -> Result<Self> {
+    pub fn new(source: &'a str) -> Self {
         let mut lexer = Token::lexer(source);
         let mut tokens = Vec::new();
-
         while let Some(token) = lexer.next() {
-            if token != Token::Whitespace && token != Token::Comment {
-                tokens.push((token, lexer.span()));
+            if let Ok(token) = token {
+                if token != Token::Whitespace && token != Token::Comment {
+                    tokens.push((token, lexer.span()));
+                }
             }
         }
-
-        Ok(Self {
+        Self {
             source,
             tokens,
             current: 0,
-        })
-    }
-
-    pub fn tokenize(&mut self) -> Result<Vec<(Token, Range<usize>)>, String> {
-        Ok(self.tokens.clone())
+        }
     }
 
     pub fn peek(&self) -> Option<&Token> {
@@ -197,7 +192,11 @@ impl<'a> Lexer<'a> {
         token
     }
 
-    pub fn current_span(&self) -> Option<Range<usize>> {
-        self.tokens.get(self.current).map(|(_, span)| span.clone())
+    pub fn current_span(&self) -> Range<usize> {
+        if let Some((_, span)) = self.tokens.get(self.current) {
+            span.clone()
+        } else {
+            0..0
+        }
     }
 } 
