@@ -1,5 +1,6 @@
 use crate::ast::*;
 use crate::error::{Result, SlangError};
+use crate::type_system::Type;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
