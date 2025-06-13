@@ -1,7 +1,7 @@
 use crate::type_system::Type;
 use std::fmt;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct AST {
     pub functions: Vec<Function>,
     pub type_definitions: Vec<TypeDefinition>,
@@ -15,21 +15,21 @@ impl AST {
         }
     }
 
-    pub fn add_function(&mut self, function: Function) {
-        self.functions.push(function);
+    pub fn add_function(&mut self, func: Function) {
+        self.functions.push(func);
     }
 
-    pub fn add_type_definition(&mut self, type_definition: TypeDefinition) {
-        self.type_definitions.push(type_definition);
+    pub fn add_type_definition(&mut self, def: TypeDefinition) {
+        self.type_definitions.push(def);
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Program {
     pub items: Vec<Item>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Item {
     Function(Function),
     Struct(Struct),
@@ -38,34 +38,39 @@ pub enum Item {
     Macro(Macro),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Function {
     pub name: String,
     pub parameters: Vec<Parameter>,
     pub return_type: Type,
     pub priority: i32,
-    pub body: Vec<Statement>,
+    pub body: Block,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Parameter {
     pub name: String,
     pub type_annotation: Type,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TypeDefinition {
     pub name: String,
     pub fields: Vec<Field>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Field {
     pub name: String,
     pub type_annotation: Type,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
+pub struct Block {
+    pub statements: Vec<Statement>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
     Let(LetStatement),
     Return(ReturnStatement),
@@ -76,185 +81,185 @@ pub enum Statement {
     Expression(Box<Expression>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LetStatement {
     pub name: String,
-    pub value: Box<Expression>,
     pub type_annotation: Option<Type>,
+    pub value: Box<Expression>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ReturnStatement {
     pub value: Option<Box<Expression>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct IfStatement {
     pub condition: Box<Expression>,
-    pub then_branch: Vec<Statement>,
-    pub else_branch: Option<Vec<Statement>>,
+    pub then_block: Block,
+    pub else_block: Option<Block>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct WhileStatement {
     pub condition: Box<Expression>,
-    pub body: Vec<Statement>,
+    pub body: Block,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ForStatement {
     pub variable: String,
     pub iterator: Box<Expression>,
-    pub body: Vec<Statement>,
+    pub body: Block,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MatchStatement {
     pub expression: Box<Expression>,
     pub arms: Vec<MatchArm>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MatchArm {
     pub pattern: Pattern,
-    pub body: Vec<Statement>,
+    pub body: Block,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Pattern {
-    Literal(Literal),
     Identifier(String),
-    Tuple(Vec<Pattern>),
-    Struct(String, Vec<FieldPattern>),
+    Literal(Literal),
     Wildcard,
+    Tuple(Vec<Pattern>),
+    Struct { name: String, fields: Vec<FieldPattern> },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FieldPattern {
     pub name: String,
     pub pattern: Box<Pattern>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     Literal(Literal),
     Identifier(String),
-    BinaryOp(BinaryOpExpression),
-    UnaryOp(UnaryOpExpression),
-    Call(CallExpression),
+    BinaryOp(Box<BinaryOpExpression>),
+    UnaryOp(Box<UnaryOpExpression>),
+    Call(Box<CallExpression>),
     Assignment(Box<AssignmentExpression>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
-    Integer(i64),
+    Int(i64),
     Float(f64),
+    Bool(bool),
     String(String),
-    Boolean(bool),
     Null,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct BinaryOpExpression {
     pub left: Box<Expression>,
     pub op: BinaryOperator,
     pub right: Box<Expression>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum BinaryOperator {
     Add,
-    Subtract,
-    Multiply,
-    Divide,
-    Modulo,
-    Equals,
-    NotEquals,
-    LessThan,
-    GreaterThan,
-    LessThanEquals,
-    GreaterThanEquals,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    Eq,
+    Neq,
+    Lt,
+    Lte,
+    Gt,
+    Gte,
     And,
     Or,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct UnaryOpExpression {
     pub op: UnaryOperator,
     pub right: Box<Expression>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum UnaryOperator {
-    Negate,
+    Neg,
     Not,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CallExpression {
     pub function: String,
     pub arguments: Vec<Box<Expression>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct AssignmentExpression {
     pub target: String,
     pub value: Box<Expression>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Struct {
     pub name: String,
     pub fields: Vec<StructField>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct StructField {
     pub name: String,
     pub type_: Type,
     pub priority: Option<MemoryPriority>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Trait {
     pub name: String,
     pub methods: Vec<TraitMethod>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TraitMethod {
     pub name: String,
     pub params: Vec<Parameter>,
     pub return_type: Type,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Module {
     pub name: String,
     pub items: Vec<Item>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Macro {
     pub name: String,
     pub patterns: Vec<MacroPattern>,
     pub body: Block,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MacroPattern {
     pub pattern: Pattern,
     pub guard: Option<Expression>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum PriorityType {
     Log(LogPriority),
     Function(FunctionPriority),
     Memory(MemoryPriority),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum LogPriority {
     Log,
     Info,
@@ -264,14 +269,14 @@ pub enum LogPriority {
     Error,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum FunctionPriority {
     Level(i32),
     MostLow,
     MostHigh,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum MemoryPriority {
     Level(i32),
     MultiLevel(Vec<i32>),
@@ -314,18 +319,7 @@ impl fmt::Display for AST {
 
 impl fmt::Display for Function {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "fn {}(", self.name)?;
-        for (i, param) in self.parameters.iter().enumerate() {
-            if i > 0 {
-                write!(f, ", ")?;
-            }
-            write!(f, "{}", param)?;
-        }
-        writeln!(f, ") -> {} {{", self.return_type)?;
-        for stmt in &self.body {
-            writeln!(f, "    {}", stmt)?;
-        }
-        writeln!(f, "}}")
+        write!(f, "fn {}({}) -> {} [priority: {}] {}", self.name, self.parameters.iter().map(|p| p.to_string()).collect::<Vec<_>>().join(", "), self.return_type, self.priority, self.body)
     }
 }
 
@@ -337,11 +331,7 @@ impl fmt::Display for Parameter {
 
 impl fmt::Display for TypeDefinition {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "type {} {{", self.name)?;
-        for field in &self.fields {
-            writeln!(f, "    {}", field)?;
-        }
-        writeln!(f, "}}")
+        write!(f, "type {} {{ {} }}", self.name, self.fields.iter().map(|f| f.to_string()).collect::<Vec<_>>().join(", "))
     }
 }
 
@@ -388,12 +378,12 @@ impl fmt::Display for ReturnStatement {
 impl fmt::Display for IfStatement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "if {} {{", self.condition)?;
-        for stmt in &self.then_branch {
+        for stmt in &self.then_block.statements {
             writeln!(f, "    {}", stmt)?;
         }
-        if let Some(else_branch) = &self.else_branch {
+        if let Some(else_block) = &self.else_block {
             writeln!(f, "}} else {{")?;
-            for stmt in else_branch {
+            for stmt in &else_block.statements {
                 writeln!(f, "    {}", stmt)?;
             }
         }
@@ -404,7 +394,7 @@ impl fmt::Display for IfStatement {
 impl fmt::Display for WhileStatement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "while {} {{", self.condition)?;
-        for stmt in &self.body {
+        for stmt in &self.body.statements {
             writeln!(f, "    {}", stmt)?;
         }
         writeln!(f, "}}")
@@ -414,7 +404,7 @@ impl fmt::Display for WhileStatement {
 impl fmt::Display for ForStatement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "for {} in {} {{", self.variable, self.iterator)?;
-        for stmt in &self.body {
+        for stmt in &self.body.statements {
             writeln!(f, "    {}", stmt)?;
         }
         writeln!(f, "}}")
@@ -434,7 +424,7 @@ impl fmt::Display for MatchStatement {
 impl fmt::Display for MatchArm {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "{} => {{", self.pattern)?;
-        for stmt in &self.body {
+        for stmt in &self.body.statements {
             writeln!(f, "        {}", stmt)?;
         }
         writeln!(f, "    }},")
@@ -456,7 +446,7 @@ impl fmt::Display for Pattern {
                 }
                 write!(f, ")")
             }
-            Pattern::Struct(name, fields) => {
+            Pattern::Struct { name, fields } => {
                 write!(f, "{} {{", name)?;
                 for (i, field) in fields.iter().enumerate() {
                     if i > 0 {
@@ -524,10 +514,10 @@ impl fmt::Display for AssignmentExpression {
 impl fmt::Display for Literal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Literal::Integer(i) => write!(f, "{}", i),
+            Literal::Int(i) => write!(f, "{}", i),
             Literal::Float(fl) => write!(f, "{}", fl),
+            Literal::Bool(b) => write!(f, "{}", b),
             Literal::String(s) => write!(f, "\"{}\"", s),
-            Literal::Boolean(b) => write!(f, "{}", b),
             Literal::Null => write!(f, "null"),
         }
     }
@@ -537,16 +527,16 @@ impl fmt::Display for BinaryOperator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             BinaryOperator::Add => write!(f, "+"),
-            BinaryOperator::Subtract => write!(f, "-"),
-            BinaryOperator::Multiply => write!(f, "*"),
-            BinaryOperator::Divide => write!(f, "/"),
-            BinaryOperator::Modulo => write!(f, "%"),
-            BinaryOperator::Equals => write!(f, "=="),
-            BinaryOperator::NotEquals => write!(f, "!="),
-            BinaryOperator::LessThan => write!(f, "<"),
-            BinaryOperator::GreaterThan => write!(f, ">"),
-            BinaryOperator::LessThanEquals => write!(f, "<="),
-            BinaryOperator::GreaterThanEquals => write!(f, ">="),
+            BinaryOperator::Sub => write!(f, "-"),
+            BinaryOperator::Mul => write!(f, "*"),
+            BinaryOperator::Div => write!(f, "/"),
+            BinaryOperator::Mod => write!(f, "%"),
+            BinaryOperator::Eq => write!(f, "=="),
+            BinaryOperator::Neq => write!(f, "!="),
+            BinaryOperator::Lt => write!(f, "<"),
+            BinaryOperator::Lte => write!(f, "<="),
+            BinaryOperator::Gt => write!(f, ">"),
+            BinaryOperator::Gte => write!(f, ">="),
             BinaryOperator::And => write!(f, "&&"),
             BinaryOperator::Or => write!(f, "||"),
         }
@@ -556,9 +546,19 @@ impl fmt::Display for BinaryOperator {
 impl fmt::Display for UnaryOperator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            UnaryOperator::Negate => write!(f, "-"),
+            UnaryOperator::Neg => write!(f, "-"),
             UnaryOperator::Not => write!(f, "!"),
         }
+    }
+}
+
+impl fmt::Display for Block {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{{\n")?;
+        for stmt in &self.statements {
+            writeln!(f, "  {}", stmt)?;
+        }
+        write!(f, "}}")
     }
 }
 
