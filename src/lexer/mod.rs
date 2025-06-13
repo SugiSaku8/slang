@@ -57,24 +57,21 @@ pub enum Token {
     #[token("most_high")]
     MostHigh,
 
+    #[token("true")]
+    True,
+
+    #[token("false")]
+    False,
+
+    #[token("null")]
+    Null,
+
     // 演算子
-    #[token("+")]
-    Plus,
-
-    #[token("-")]
-    Minus,
-
-    #[token("*")]
-    Star,
-
-    #[token("/")]
-    Slash,
-
     #[token("=")]
-    Equals,
+    Assign,
 
     #[token("==")]
-    EqualsEquals,
+    Equals,
 
     #[token("!=")]
     NotEquals,
@@ -93,22 +90,22 @@ pub enum Token {
 
     // 区切り文字
     #[token("(")]
-    LeftParen,
+    LParen,
 
     #[token(")")]
-    RightParen,
+    RParen,
 
     #[token("{")]
-    LeftBrace,
+    LBrace,
 
     #[token("}")]
-    RightBrace,
+    RBrace,
 
     #[token("[")]
-    LeftBracket,
+    LBracket,
 
     #[token("]")]
-    RightBracket,
+    RBracket,
 
     #[token(":")]
     Colon,
@@ -124,6 +121,12 @@ pub enum Token {
 
     #[token("->")]
     Arrow,
+
+    #[token("=>")]
+    FatArrow,
+
+    #[token("_")]
+    Underscore,
 
     // 優先所有格関連
     #[token("Var:type:priority:")]
@@ -150,6 +153,9 @@ pub enum Token {
 
     #[token("!")]
     Not,
+
+    #[token("%")]
+    Percent,
 
     // エラー
     #[error]
