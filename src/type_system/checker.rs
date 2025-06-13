@@ -38,7 +38,7 @@ impl TypeChecker {
         let function_type = Type::Function {
             params: function.parameters.iter().map(|p| p.type_annotation.clone()).collect(),
             return_type: Box::new(function.return_type.clone()),
-            priority: Some(function.priority),
+            priority: Some(function.priority as u32),
         };
         self.current_function = Some(function_type);
 

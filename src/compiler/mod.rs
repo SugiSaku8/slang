@@ -83,35 +83,35 @@ impl Compiler {
                     Literal::Null => Ok(IRValue::Constant(IRConstant::Unit)),
                 }
             }
-            Expression::BinaryOp(BinaryOpExpression { left, op, right }) => {
-                let left_value = self.compile_expression(left)?;
-                let right_value = self.compile_expression(right)?;
+            Expression::BinaryOp(expr) => {
+                let left_value = self.compile_expression(&expr.left)?;
+                let right_value = self.compile_expression(&expr.right)?;
                 Ok(IRValue::BinaryOp {
-                    op: op.clone(),
+                    op: expr.op.clone(),
                     left: Box::new(left_value),
                     right: Box::new(right_value),
                 })
             }
-            Expression::UnaryOp(UnaryOpExpression { op, right }) => {
-                let expr_value = self.compile_expression(right)?;
+            Expression::UnaryOp(expr) => {
+                let expr_value = self.compile_expression(&expr.right)?;
                 Ok(IRValue::UnaryOp {
-                    op: op.clone(),
+                    op: expr.op.clone(),
                     expr: Box::new(expr_value),
                 })
             }
-            Expression::Call(CallExpression { function, arguments }) => {
-                let arg_values = arguments.iter()
+            Expression::Call(expr) => {
+                let arg_values = expr.arguments.iter()
                     .map(|arg| self.compile_expression(arg))
                     .collect::<Result<Vec<_>>>()?;
                 Ok(IRValue::Call {
-                    function: function.clone(),
+                    function: expr.function.clone(),
                     arguments: arg_values,
                 })
             }
-            Expression::Assignment(AssignmentExpression { target, value }) => {
-                let value = self.compile_expression(value)?;
+            Expression::Assignment(expr) => {
+                let value = self.compile_expression(&expr.value)?;
                 Ok(IRValue::Assignment {
-                    name: target.clone(),
+                    name: expr.target.clone(),
                     value: Box::new(value),
                 })
             }

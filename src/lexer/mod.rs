@@ -205,7 +205,7 @@ impl<'a> Lexer<'a> {
             return None;
         }
         self.current += 1;
-        Some(&self.tokens[current])
+        Some(&self.tokens[current].0)
     }
 
     pub fn current_span(&self) -> Range<usize> {

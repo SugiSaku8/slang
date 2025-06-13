@@ -44,7 +44,7 @@ impl TypeInference {
         let function_type = Type::Function {
             params: param_types,
             return_type: Box::new(return_type),
-            priority: Some(function.priority),
+            priority: Some(function.priority as u32),
         };
 
         // 関数本体の型を推論
@@ -79,7 +79,7 @@ impl TypeInference {
             Statement::Let(stmt) => {
                 let value_type = self.infer_expression(&stmt.value)?;
                 if let Some(annotated_type) = &stmt.type_annotation {
-                    self.add_constraint(value_type, annotated_type.clone())?;
+                    self.add_constraint(value_type.clone(), annotated_type.clone())?;
                 }
                 self.type_vars.insert(stmt.name.clone(), value_type);
             }
