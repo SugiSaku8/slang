@@ -145,7 +145,7 @@ impl TypeChecker {
                 self.check_binary_operation(&op.op, left_type, right_type)
             }
             Expression::UnaryOp(op) => {
-                let expr_type = self.check_expression(&op.expr)?;
+                let expr_type = self.check_expression(&op.right)?;
                 self.check_unary_operation(&op.op, expr_type)
             }
             Expression::Call(call) => {
