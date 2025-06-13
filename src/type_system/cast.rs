@@ -11,8 +11,8 @@ impl TypeCast {
 
     pub fn cast_literal(&self, literal: &Literal, target_type: &Type) -> Result<Literal> {
         match (literal, target_type) {
-            (Literal::Int(i), Type::Float) => Ok(Literal::Float(*i as f64)),
-            (Literal::Float(f), Type::Int) => Ok(Literal::Int(*f as i64)),
+            (Literal::Int(i), Type::Float) => Ok(Literal::Float(i as f64)),
+            (Literal::Float(f), Type::Int) => Ok(Literal::Int(f as i64)),
             (Literal::Int(i), Type::String) => Ok(Literal::String(i.to_string())),
             (Literal::Float(f), Type::String) => Ok(Literal::String(f.to_string())),
             (Literal::Bool(b), Type::String) => Ok(Literal::String(b.to_string())),
