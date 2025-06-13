@@ -1,21 +1,36 @@
-use thiserror::Error;
+use std::fmt;
 
-#[derive(Error, Debug)]
+#[derive(Debug)]
 pub enum SlangError {
-    #[error("Lexical error: {0}")]
-    Lexical(String),
-
-    #[error("Syntax error: {0}")]
     Syntax(String),
-
-    #[error("Type error: {0}")]
     Type(String),
-
-    #[error("Runtime error: {0}")]
     Runtime(String),
-
-    #[error("Compilation error: {0}")]
-    Compilation(String),
+    IO(String),
 }
 
-pub type Result<T> = std::result::Result<T, SlangError>; 
+impl fmt::Display for SlangError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SlangError::Syntax(msg) => write!(f, "Syntax error: {}", msg),
+            SlangError::Type(msg) => write!(f, "Type error: {}", msg),
+            SlangError::Runtime(msg) => write!(f, "Runtime error: {}", msg),
+            SlangError::IO(msg) => write!(f, "IO error: {}", msg),
+        }
+    }
+}
+
+impl std::error::Error for SlangError {}
+
+pub type Result<T> = std::result::Result<T, SlangError>;
+
+impl From<String> for SlangError {
+    fn from(msg: String) -> Self {
+        SlangError::Syntax(msg)
+    }
+}
+
+impl From<std::io::Error> for SlangError {
+    fn from(err: std::io::Error) -> Self {
+        SlangError::IO(err.to_string())
+    }
+} 

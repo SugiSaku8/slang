@@ -2,202 +2,160 @@ use crate::type_system::Type;
 use std::fmt;
 
 #[derive(Debug, Clone)]
-pub struct Module {
-    pub functions: Vec<Function>,
-    pub globals: Vec<Global>,
+pub struct IR {
+    pub functions: Vec<IRFunction>,
+    pub globals: Vec<IRGlobal>,
+}
+
+impl IR {
+    pub fn new() -> Self {
+        IR {
+            functions: Vec::new(),
+            globals: Vec::new(),
+        }
+    }
+
+    pub fn add_function(&mut self, function: IRFunction) {
+        self.functions.push(function);
+    }
+
+    pub fn add_global(&mut self, global: IRGlobal) {
+        self.globals.push(global);
+    }
 }
 
 #[derive(Debug, Clone)]
-pub struct Function {
+pub struct IRFunction {
     pub name: String,
-    pub params: Vec<Parameter>,
+    pub parameters: Vec<IRParameter>,
     pub return_type: Type,
-    pub blocks: Vec<Block>,
-    pub priority: Option<FunctionPriority>,
+    pub priority: Vec<i32>,
+    pub blocks: Vec<IRBlock>,
 }
 
 #[derive(Debug, Clone)]
-pub struct Parameter {
+pub struct IRParameter {
     pub name: String,
     pub type_: Type,
 }
 
 #[derive(Debug, Clone)]
-pub struct Global {
+pub struct IRGlobal {
     pub name: String,
     pub type_: Type,
-    pub value: Constant,
-    pub priority: Option<MemoryPriority>,
+    pub value: Option<IRConstant>,
 }
 
 #[derive(Debug, Clone)]
-pub struct Block {
-    pub name: String,
-    pub instructions: Vec<Instruction>,
-    pub terminator: Terminator,
+pub struct IRBlock {
+    pub label: String,
+    pub instructions: Vec<IRInstruction>,
 }
 
 #[derive(Debug, Clone)]
-pub enum Instruction {
-    Alloca(AllocaInst),
-    Load(LoadInst),
-    Store(StoreInst),
-    Binary(BinaryInst),
-    Unary(UnaryInst),
-    Call(CallInst),
-    GetElementPtr(GetElementPtrInst),
-    Phi(PhiInst),
-    Priority(PriorityInst),
+pub enum IRInstruction {
+    Alloca(IRAlloca),
+    Store(IRStore),
+    Load(IRLoad),
+    BinaryOp(IRBinaryOp),
+    UnaryOp(IRUnaryOp),
+    Call(IRCall),
+    Return(Option<IRValue>),
+    Branch(IRBranch),
+    ConditionalBranch(IRConditionalBranch),
 }
 
 #[derive(Debug, Clone)]
-pub struct AllocaInst {
-    pub name: String,
+pub struct IRAlloca {
+    pub result: String,
     pub type_: Type,
 }
 
 #[derive(Debug, Clone)]
-pub struct LoadInst {
-    pub name: String,
+pub struct IRStore {
+    pub value: IRValue,
+    pub pointer: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct IRLoad {
+    pub result: String,
+    pub pointer: String,
     pub type_: Type,
-    pub pointer: Value,
 }
 
 #[derive(Debug, Clone)]
-pub struct StoreInst {
-    pub value: Value,
-    pub pointer: Value,
+pub struct IRBinaryOp {
+    pub result: String,
+    pub op: IRBinaryOperator,
+    pub left: IRValue,
+    pub right: IRValue,
 }
 
 #[derive(Debug, Clone)]
-pub struct BinaryInst {
-    pub name: String,
-    pub type_: Type,
-    pub op: BinaryOp,
-    pub left: Value,
-    pub right: Value,
-}
-
-#[derive(Debug, Clone)]
-pub enum BinaryOp {
+pub enum IRBinaryOperator {
     Add,
-    Sub,
-    Mul,
-    Div,
-    Rem,
-    Shl,
-    Shr,
-    And,
-    Or,
-    Xor,
+    Subtract,
+    Multiply,
+    Divide,
+    Modulo,
+    Equals,
+    NotEquals,
+    LessThan,
+    GreaterThan,
+    LessThanEquals,
+    GreaterThanEquals,
 }
 
 #[derive(Debug, Clone)]
-pub struct UnaryInst {
-    pub name: String,
-    pub type_: Type,
-    pub op: UnaryOp,
-    pub operand: Value,
+pub struct IRUnaryOp {
+    pub result: String,
+    pub op: IRUnaryOperator,
+    pub operand: IRValue,
 }
 
 #[derive(Debug, Clone)]
-pub enum UnaryOp {
-    Neg,
+pub enum IRUnaryOperator {
+    Negate,
     Not,
 }
 
 #[derive(Debug, Clone)]
-pub struct CallInst {
-    pub name: String,
-    pub type_: Type,
-    pub callee: String,
-    pub args: Vec<Value>,
+pub struct IRCall {
+    pub result: Option<String>,
+    pub function: String,
+    pub arguments: Vec<IRValue>,
 }
 
 #[derive(Debug, Clone)]
-pub struct GetElementPtrInst {
-    pub name: String,
-    pub type_: Type,
-    pub base: Value,
-    pub indices: Vec<Value>,
+pub struct IRBranch {
+    pub target: String,
 }
 
 #[derive(Debug, Clone)]
-pub struct PhiInst {
-    pub name: String,
-    pub type_: Type,
-    pub incoming: Vec<(Value, String)>,
+pub struct IRConditionalBranch {
+    pub condition: IRValue,
+    pub true_target: String,
+    pub false_target: String,
 }
 
 #[derive(Debug, Clone)]
-pub struct PriorityInst {
-    pub name: String,
-    pub type_: Type,
-    pub priority_type: PriorityType,
-    pub value: Value,
+pub enum IRValue {
+    Constant(IRConstant),
+    Variable(String),
 }
 
 #[derive(Debug, Clone)]
-pub enum Terminator {
-    Ret(Option<Value>),
-    Br(String),
-    CondBr(Value, String, String),
-    Switch(Value, String, Vec<(Constant, String)>),
-}
-
-#[derive(Debug, Clone)]
-pub enum Value {
-    Constant(Constant),
-    Instruction(String),
-    Parameter(String),
-    Global(String),
-}
-
-#[derive(Debug, Clone)]
-pub enum Constant {
-    Int(i64),
+pub enum IRConstant {
+    Integer(i64),
     Float(f64),
-    Bool(bool),
-    Char(char),
+    Boolean(bool),
     String(String),
-    Array(Vec<Constant>),
-    Struct(Vec<Constant>),
-    Null,
+    Array(Vec<IRConstant>),
+    Tuple(Vec<IRConstant>),
 }
 
-#[derive(Debug, Clone)]
-pub enum PriorityType {
-    Log(LogPriority),
-    Function(FunctionPriority),
-    Memory(MemoryPriority),
-}
-
-#[derive(Debug, Clone)]
-pub enum LogPriority {
-    Log,
-    Info,
-    Debug,
-    Warn,
-    Alert,
-    Error,
-}
-
-#[derive(Debug, Clone)]
-pub enum FunctionPriority {
-    Level(i32),
-    MostLow,
-    MostHigh,
-}
-
-#[derive(Debug, Clone)]
-pub enum MemoryPriority {
-    Level(i32),
-    MultiLevel(Vec<i32>),
-    MostLow,
-    MostHigh,
-}
-
-impl fmt::Display for Module {
+impl fmt::Display for IR {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for global in &self.globals {
             writeln!(f, "{}", global)?;
