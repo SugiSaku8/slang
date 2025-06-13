@@ -1,0 +1,14 @@
+[package]
+name = "slang"
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <your.email@example.com>"]
+description = "A new compiled programming language S"
+
+[dependencies]
+logos = "0.14.0"  # For lexer
+thiserror = "1.0"  # For error handling
+anyhow = "1.0"     # For error handling
+
+[dev-dependencies]
+criterion = "0.5"  # For benchmarking 
