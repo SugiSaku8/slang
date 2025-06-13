@@ -83,9 +83,9 @@ impl Runtime {
                     return Err(SlangError::Runtime("Condition must be boolean".to_string()));
                 }
             }
-            crate::ir::IRInstruction::Assignment { name, value } => {
+            crate::ir::IRInstruction::Assignment { target, value } => {
                 let value = self.evaluate_value(value)?;
-                self.memory_manager.heap.insert(name.clone(), value);
+                self.memory_manager.heap.insert(target.clone(), value);
             }
             crate::ir::IRInstruction::Expression(value) => {
                 self.evaluate_value(value)?;
@@ -401,8 +401,8 @@ impl MemoryManager {
         self.heap.insert(name, value);
     }
 
-    fn get_value(&self, name: &str) -> Option<Box<dyn Any>> {
-        self.heap.get(name).cloned()
+    fn get_value(&self, name: &str) -> Option<&Box<dyn Any>> {
+        self.heap.get(name)
     }
 
     fn deallocate(&mut self, address: usize) {
