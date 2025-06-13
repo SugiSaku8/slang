@@ -2,6 +2,29 @@ use crate::type_system::Type;
 use std::fmt;
 
 #[derive(Debug, Clone)]
+pub struct AST {
+    pub functions: Vec<Function>,
+    pub type_definitions: Vec<TypeDefinition>,
+}
+
+impl AST {
+    pub fn new() -> Self {
+        AST {
+            functions: Vec::new(),
+            type_definitions: Vec::new(),
+        }
+    }
+
+    pub fn add_function(&mut self, function: Function) {
+        self.functions.push(function);
+    }
+
+    pub fn add_type_definition(&mut self, type_def: TypeDefinition) {
+        self.type_definitions.push(type_def);
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Program {
     pub items: Vec<Item>,
 }
@@ -18,113 +41,102 @@ pub enum Item {
 #[derive(Debug, Clone)]
 pub struct Function {
     pub name: String,
-    pub params: Vec<Parameter>,
+    pub parameters: Vec<Parameter>,
     pub return_type: Type,
-    pub body: Block,
-    pub priority: Option<FunctionPriority>,
+    pub priority: Vec<i32>,
+    pub body: Vec<Statement>,
 }
 
 #[derive(Debug, Clone)]
 pub struct Parameter {
     pub name: String,
-    pub type_: Type,
+    pub type_annotation: Type,
 }
 
 #[derive(Debug, Clone)]
-pub struct Block {
-    pub statements: Vec<Statement>,
+pub struct TypeDefinition {
+    pub name: String,
+    pub type_: Type,
 }
 
 #[derive(Debug, Clone)]
 pub enum Statement {
     Let(LetStatement),
-    Expression(Expression),
-    Return(Option<Expression>),
+    Return(Expression),
     If(IfStatement),
-    Match(MatchStatement),
     While(WhileStatement),
     For(ForStatement),
-    Priority(PriorityStatement),
+    Match(MatchStatement),
+    Expression(Expression),
 }
 
 #[derive(Debug, Clone)]
 pub struct LetStatement {
     pub name: String,
-    pub type_: Option<Type>,
+    pub type_annotation: Option<Type>,
     pub value: Expression,
-    pub priority: Option<MemoryPriority>,
 }
 
 #[derive(Debug, Clone)]
 pub struct IfStatement {
     pub condition: Expression,
-    pub then_block: Block,
-    pub else_block: Option<Block>,
+    pub then_branch: Vec<Statement>,
+    pub else_branch: Option<Vec<Statement>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct WhileStatement {
+    pub condition: Expression,
+    pub body: Vec<Statement>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ForStatement {
+    pub variable: String,
+    pub iterator: Expression,
+    pub body: Vec<Statement>,
 }
 
 #[derive(Debug, Clone)]
 pub struct MatchStatement {
-    pub expression: Expression,
+    pub value: Expression,
     pub arms: Vec<MatchArm>,
 }
 
 #[derive(Debug, Clone)]
 pub struct MatchArm {
     pub pattern: Pattern,
-    pub guard: Option<Expression>,
-    pub body: Block,
+    pub body: Vec<Statement>,
 }
 
 #[derive(Debug, Clone)]
-pub struct WhileStatement {
-    pub condition: Expression,
-    pub body: Block,
-}
-
-#[derive(Debug, Clone)]
-pub struct ForStatement {
-    pub pattern: Pattern,
-    pub iterator: Expression,
-    pub body: Block,
-}
-
-#[derive(Debug, Clone)]
-pub struct PriorityStatement {
-    pub priority_type: PriorityType,
-    pub value: Expression,
+pub enum Pattern {
+    Identifier(String),
+    Tuple(Vec<Pattern>),
 }
 
 #[derive(Debug, Clone)]
 pub enum Expression {
     Literal(Literal),
     Identifier(String),
-    Binary(BinaryExpression),
-    Unary(UnaryExpression),
+    BinaryOp(BinaryOpExpression),
+    UnaryOp(UnaryOpExpression),
     Call(CallExpression),
-    Member(MemberExpression),
-    Index(IndexExpression),
-    Block(Block),
-    If(IfExpression),
-    Match(MatchExpression),
-    Lambda(LambdaExpression),
-    Priority(PriorityExpression),
+    Assignment(Box<AssignmentExpression>),
 }
 
 #[derive(Debug, Clone)]
 pub enum Literal {
     Integer(i64),
     Float(f64),
-    Boolean(bool),
-    Character(char),
     String(String),
-    Array(Vec<Expression>),
-    Tuple(Vec<Expression>),
+    Boolean(bool),
 }
 
 #[derive(Debug, Clone)]
-pub struct BinaryExpression {
+pub struct BinaryOpExpression {
     pub left: Box<Expression>,
-    pub operator: BinaryOperator,
+    pub op: BinaryOperator,
     pub right: Box<Expression>,
 }
 
@@ -135,20 +147,18 @@ pub enum BinaryOperator {
     Multiply,
     Divide,
     Modulo,
-    Equal,
-    NotEqual,
+    Equals,
+    NotEquals,
     LessThan,
     GreaterThan,
-    LessEqual,
-    GreaterEqual,
-    And,
-    Or,
+    LessThanEquals,
+    GreaterThanEquals,
 }
 
 #[derive(Debug, Clone)]
-pub struct UnaryExpression {
-    pub operator: UnaryOperator,
-    pub expression: Box<Expression>,
+pub struct UnaryOpExpression {
+    pub op: UnaryOperator,
+    pub right: Box<Expression>,
 }
 
 #[derive(Debug, Clone)]
@@ -159,55 +169,14 @@ pub enum UnaryOperator {
 
 #[derive(Debug, Clone)]
 pub struct CallExpression {
-    pub callee: Box<Expression>,
+    pub function: String,
     pub arguments: Vec<Expression>,
 }
 
 #[derive(Debug, Clone)]
-pub struct MemberExpression {
-    pub object: Box<Expression>,
-    pub property: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct IndexExpression {
-    pub array: Box<Expression>,
-    pub index: Box<Expression>,
-}
-
-#[derive(Debug, Clone)]
-pub struct IfExpression {
-    pub condition: Box<Expression>,
-    pub then_branch: Box<Expression>,
-    pub else_branch: Box<Expression>,
-}
-
-#[derive(Debug, Clone)]
-pub struct MatchExpression {
-    pub expression: Box<Expression>,
-    pub arms: Vec<MatchArm>,
-}
-
-#[derive(Debug, Clone)]
-pub struct LambdaExpression {
-    pub params: Vec<Parameter>,
-    pub return_type: Type,
-    pub body: Box<Expression>,
-}
-
-#[derive(Debug, Clone)]
-pub struct PriorityExpression {
-    pub priority_type: PriorityType,
-    pub expression: Box<Expression>,
-}
-
-#[derive(Debug, Clone)]
-pub enum Pattern {
-    Literal(Literal),
-    Identifier(String),
-    Tuple(Vec<Pattern>),
-    Struct(String, Vec<(String, Pattern)>),
-    Wildcard,
+pub struct AssignmentExpression {
+    pub target: Expression,
+    pub value: Expression,
 }
 
 #[derive(Debug, Clone)]
