@@ -66,6 +66,10 @@ impl Type {
         matches!(self, Type::Pointer(_))
     }
 
+    pub fn is_numeric(&self) -> bool {
+        matches!(self, Type::Int | Type::Float)
+    }
+
     pub fn get_vector_dimension(&self) -> Option<usize> {
         match self {
             Type::Vector(dim, _) => Some(*dim),

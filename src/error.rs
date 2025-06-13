@@ -4,6 +4,7 @@ use std::fmt;
 pub enum SlangError {
     Syntax(String),
     Type(String),
+    Compilation(String),
     Runtime(String),
     IO(String),
 }
@@ -13,6 +14,7 @@ impl fmt::Display for SlangError {
         match self {
             SlangError::Syntax(msg) => write!(f, "Syntax error: {}", msg),
             SlangError::Type(msg) => write!(f, "Type error: {}", msg),
+            SlangError::Compilation(msg) => write!(f, "Compilation error: {}", msg),
             SlangError::Runtime(msg) => write!(f, "Runtime error: {}", msg),
             SlangError::IO(msg) => write!(f, "IO error: {}", msg),
         }

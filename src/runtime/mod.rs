@@ -36,15 +36,63 @@ impl Runtime {
 
     fn execute_instruction(&mut self, instruction: &crate::ir::IRInstruction) -> Result<()> {
         match instruction {
+            crate::ir::IRInstruction::Alloca { name, type_annotation: _ } => {
+                self.memory_manager.heap.insert(name.clone(), Box::new(()));
+            }
             crate::ir::IRInstruction::Store { name, value } => {
                 let value = self.evaluate_value(value)?;
-                self.memory_manager.allocate_value(name.clone(), value);
+                self.memory_manager.heap.insert(name.clone(), value);
+            }
+            crate::ir::IRInstruction::Load { name } => {
+                if !self.memory_manager.heap.contains_key(name) {
+                    return Err(SlangError::Runtime(format!("Undefined variable: {}", name)));
+                }
+            }
+            crate::ir::IRInstruction::BinaryOp { dest, op, left, right } => {
+                let left_value = self.evaluate_value(left)?;
+                let right_value = self.evaluate_value(right)?;
+                let result = self.execute_binary_op(op, left_value, right_value)?;
+                self.memory_manager.heap.insert(dest.clone(), result);
+            }
+            crate::ir::IRInstruction::UnaryOp { dest, op, expr } => {
+                let value = self.evaluate_value(expr)?;
+                let result = self.execute_unary_op(op, value)?;
+                self.memory_manager.heap.insert(dest.clone(), result);
+            }
+            crate::ir::IRInstruction::Call { dest, function, arguments } => {
+                let args = arguments.iter()
+                    .map(|arg| self.evaluate_value(arg))
+                    .collect::<Result<Vec<_>>>()?;
+                let result = self.execute_function_call(function, &args)?;
+                self.memory_manager.heap.insert(dest.clone(), result);
             }
             crate::ir::IRInstruction::Return(value) => {
                 if let Some(value) = value {
                     let value = self.evaluate_value(value)?;
                     println!("Return value: {:?}", value);
                 }
+            }
+            crate::ir::IRInstruction::Branch { label } => {
+                self.current_block = label.clone();
+            }
+            crate::ir::IRInstruction::ConditionalBranch { condition, then_label, else_label } => {
+                let cond = self.evaluate_value(condition)?;
+                if let Some(b) = cond.downcast_ref::<bool>() {
+                    self.current_block = if *b { then_label.clone() } else { else_label.clone() };
+                } else {
+                    return Err(SlangError::Runtime("Condition must be boolean".to_string()));
+                }
+            }
+            crate::ir::IRInstruction::Assignment { name, value } => {
+                let value = self.evaluate_value(value)?;
+                self.memory_manager.heap.insert(name.clone(), value);
+            }
+            crate::ir::IRInstruction::Expression(value) => {
+                self.evaluate_value(value)?;
+            }
+            crate::ir::IRInstruction::Let { name, value } => {
+                let value = self.evaluate_value(value)?;
+                self.memory_manager.heap.insert(name.clone(), value);
             }
         }
         Ok(())
@@ -82,7 +130,7 @@ impl Runtime {
             }
             crate::ir::IRValue::Assignment { target, value } => {
                 let value = self.evaluate_value(value)?;
-                self.memory_manager.allocate_value(target.clone(), value);
+                self.memory_manager.heap.insert(target.clone(), value);
                 Ok(Box::new(()))
             }
         }
@@ -354,7 +402,7 @@ impl MemoryManager {
     }
 
     fn get_value(&self, name: &str) -> Option<Box<dyn Any>> {
-        self.heap.get(name).map(|v| v.clone())
+        self.heap.get(name).cloned()
     }
 
     fn deallocate(&mut self, address: usize) {

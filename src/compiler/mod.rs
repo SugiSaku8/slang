@@ -51,7 +51,7 @@ impl Compiler {
         for statement in &function.body.statements {
             match statement {
                 Statement::Let(LetStatement { name, value, type_annotation: _ }) => {
-                    let value = self.convert_expression(value)?;
+                    let value = self.compile_expression(value)?;
                     ir_function.blocks[0].instructions.push(IRInstruction::Store {
                         name: name.clone(),
                         value,
@@ -59,7 +59,7 @@ impl Compiler {
                 }
                 Statement::Return(ReturnStatement { value }) => {
                     if let Some(value) = value {
-                        let value = self.convert_expression(value)?;
+                        let value = self.compile_expression(value)?;
                         ir_function.blocks[0].instructions.push(IRInstruction::Return(Some(value)));
                     } else {
                         ir_function.blocks[0].instructions.push(IRInstruction::Return(None));
@@ -72,7 +72,7 @@ impl Compiler {
         Ok(ir_function)
     }
 
-    fn convert_expression(&self, expression: &Expression) -> Result<IRValue> {
+    fn compile_expression(&self, expression: &Expression) -> Result<IRValue> {
         match expression {
             Expression::Literal(lit) => {
                 match lit {
@@ -84,53 +84,34 @@ impl Compiler {
                 }
             }
             Expression::BinaryOp(BinaryOpExpression { left, op, right }) => {
-                let left = self.convert_expression(left)?;
-                let right = self.convert_expression(right)?;
-                let op = match op {
-                    BinaryOperator::Add => IRBinaryOperator::Add,
-                    BinaryOperator::Sub => IRBinaryOperator::Sub,
-                    BinaryOperator::Mul => IRBinaryOperator::Mul,
-                    BinaryOperator::Div => IRBinaryOperator::Div,
-                    BinaryOperator::Eq => IRBinaryOperator::Eq,
-                    BinaryOperator::Neq => IRBinaryOperator::Neq,
-                    BinaryOperator::Lt => IRBinaryOperator::Lt,
-                    BinaryOperator::Lte => IRBinaryOperator::Lte,
-                    BinaryOperator::Gt => IRBinaryOperator::Gt,
-                    BinaryOperator::Gte => IRBinaryOperator::Gte,
-                    BinaryOperator::And => IRBinaryOperator::And,
-                    BinaryOperator::Or => IRBinaryOperator::Or,
-                };
+                let left_value = self.compile_expression(left)?;
+                let right_value = self.compile_expression(right)?;
                 Ok(IRValue::BinaryOp {
-                    left: Box::new(left),
-                    op,
-                    right: Box::new(right),
+                    op: op.clone(),
+                    left: Box::new(left_value),
+                    right: Box::new(right_value),
                 })
             }
             Expression::UnaryOp(UnaryOpExpression { op, right }) => {
-                let expr = self.convert_expression(right)?;
-                let op = match op {
-                    UnaryOperator::Not => IRUnaryOperator::Not,
-                    UnaryOperator::Neg => IRUnaryOperator::Neg,
-                };
+                let expr_value = self.compile_expression(right)?;
                 Ok(IRValue::UnaryOp {
-                    op,
-                    expr: Box::new(expr),
+                    op: op.clone(),
+                    expr: Box::new(expr_value),
                 })
             }
             Expression::Call(CallExpression { function, arguments }) => {
-                let args = arguments
-                    .iter()
-                    .map(|arg| self.convert_expression(arg))
+                let arg_values = arguments.iter()
+                    .map(|arg| self.compile_expression(arg))
                     .collect::<Result<Vec<_>>>()?;
                 Ok(IRValue::Call {
                     function: function.clone(),
-                    arguments: args,
+                    arguments: arg_values,
                 })
             }
             Expression::Assignment(AssignmentExpression { target, value }) => {
-                let value = self.convert_expression(value)?;
+                let value = self.compile_expression(value)?;
                 Ok(IRValue::Assignment {
-                    target: target.clone(),
+                    name: target.clone(),
                     value: Box::new(value),
                 })
             }

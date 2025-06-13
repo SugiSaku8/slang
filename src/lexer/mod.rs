@@ -203,11 +203,12 @@ impl<'a> Lexer<'a> {
     }
 
     pub fn next(&mut self) -> Option<&Token> {
-        let token = self.peek();
-        if token.is_some() {
-            self.current += 1;
+        let current = self.current;
+        if current >= self.tokens.len() {
+            return None;
         }
-        token
+        self.current += 1;
+        Some(&self.tokens[current])
     }
 
     pub fn current_span(&self) -> Range<usize> {

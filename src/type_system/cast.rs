@@ -1,5 +1,6 @@
 use crate::error::{Result, SlangError};
 use crate::ast::Literal;
+use crate::type_system::Type;
 
 #[derive(Debug, Clone)]
 pub struct TypeCast;

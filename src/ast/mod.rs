@@ -461,7 +461,7 @@ impl fmt::Display for Pattern {
                     if i > 0 {
                         write!(f, ", ")?;
                     }
-                    write!(f, "{}", field)?;
+                    write!(f, "{}: {}", field.name, field.pattern)?;
                 }
                 write!(f, "}}")
             }
@@ -587,7 +587,7 @@ impl fmt::Display for Struct {
             if i > 0 {
                 write!(f, ", ")?;
             }
-            write!(f, "{}: {}", field.name, field.type_annotation)?;
+            write!(f, "{}: {}", field.name, field.type_)?;
         }
         write!(f, "}}")
     }
@@ -623,6 +623,19 @@ impl fmt::Display for Macro {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "macro {} {{", self.name)?;
         write!(f, "}}")
+    }
+}
+
+impl fmt::Display for TraitMethod {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "fn {}({}) -> {}", 
+            self.name,
+            self.params.iter()
+                .map(|p| format!("{}: {}", p.name, p.type_annotation))
+                .collect::<Vec<_>>()
+                .join(", "),
+            self.return_type
+        )
     }
 }
 
