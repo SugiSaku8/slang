@@ -65,6 +65,7 @@ pub enum IRInstruction {
     ConditionalBranch { condition: IRValue, then_label: String, else_label: String },
     Assignment { target: String, value: IRValue },
     Expression(IRValue),
+    Let { name: String, value: IRValue },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -82,12 +83,23 @@ pub enum IRBinaryOperator {
     Gte,
     And,
     Or,
+    Subtract,
+    Multiply,
+    Divide,
+    Modulo,
+    Equals,
+    NotEquals,
+    LessThan,
+    GreaterThan,
+    LessThanEquals,
+    GreaterThanEquals,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum IRUnaryOperator {
     Neg,
     Not,
+    Negate,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -98,7 +110,12 @@ pub enum IRValue {
     String(String),
     Null,
     Identifier(String),
-    // 変数や関数呼び出しなどの値
+    Constant(Box<IRValue>),
+    Variable(String),
+    BinaryOp { left: Box<IRValue>, op: IRBinaryOperator, right: Box<IRValue> },
+    UnaryOp { op: IRUnaryOperator, expr: Box<IRValue> },
+    Call { function: String, arguments: Vec<IRValue> },
+    Assignment { name: String, value: Box<IRValue> },
 }
 
 impl fmt::Display for IR {
@@ -154,6 +171,7 @@ impl fmt::Display for IRInstruction {
             IRInstruction::ConditionalBranch { condition, then_label, else_label } => write!(f, "br_if {} {} {}", condition, then_label, else_label),
             IRInstruction::Assignment { target, value } => write!(f, "{} = {}", target, value),
             IRInstruction::Expression(value) => write!(f, "expr {}", value),
+            IRInstruction::Let { name, value } => write!(f, "let {} = {}", name, value),
         }
     }
 }
@@ -167,6 +185,12 @@ impl fmt::Display for IRValue {
             IRValue::String(s) => write!(f, "\"{}\"", s),
             IRValue::Null => write!(f, "null"),
             IRValue::Identifier(name) => write!(f, "{}", name),
+            IRValue::Constant(c) => write!(f, "{}", c),
+            IRValue::Variable(v) => write!(f, "{}", v),
+            IRValue::BinaryOp { left, op, right } => write!(f, "{} {} {}", left, op, right),
+            IRValue::UnaryOp { op, expr } => write!(f, "{} {}", op, expr),
+            IRValue::Call { function, arguments } => write!(f, "{} {}({})", function, function, arguments.iter().map(|a| a.to_string()).collect::<Vec<_>>().join(", ")),
+            IRValue::Assignment { name, value } => write!(f, "{} = {}", name, value),
         }
     }
 }
@@ -188,6 +212,16 @@ impl fmt::Display for IRBinaryOperator {
             Gte => ">=",
             And => "&&",
             Or => "||",
+            Subtract => "-",
+            Multiply => "*",
+            Divide => "/",
+            Modulo => "%",
+            Equals => "==",
+            NotEquals => "!=",
+            LessThan => "<",
+            GreaterThan => ">",
+            LessThanEquals => "<=",
+            GreaterThanEquals => ">=",
         })
     }
 }
@@ -198,6 +232,7 @@ impl fmt::Display for IRUnaryOperator {
         write!(f, "{}", match self {
             Neg => "-",
             Not => "!",
+            Negate => "-",
         })
     }
 } 
