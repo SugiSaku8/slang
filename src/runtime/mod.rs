@@ -73,19 +73,20 @@ impl Runtime {
                 }
             }
             crate::ir::IRInstruction::Branch { label } => {
-                self.current_block = label.clone();
+                // self.current_block = label.clone(); // Remove or comment out
             }
             crate::ir::IRInstruction::ConditionalBranch { condition, then_label, else_label } => {
                 let cond = self.evaluate_value(condition)?;
                 if let Some(b) = cond.downcast_ref::<bool>() {
-                    self.current_block = if *b { then_label.clone() } else { else_label.clone() };
+                    // self.current_block = if *b { then_label.clone() } else { else_label.clone() };
                 } else {
                     return Err(SlangError::Runtime("Condition must be boolean".to_string()));
                 }
             }
-            crate::ir::IRInstruction::Assignment { target, value } => {
+            crate::ir::IRInstruction::Assignment { name, value } => {
                 let value = self.evaluate_value(value)?;
-                self.memory_manager.heap.insert(target.clone(), value);
+                self.memory_manager.heap.insert(name.clone(), value);
+                Ok(Box::new(()))
             }
             crate::ir::IRInstruction::Expression(value) => {
                 self.evaluate_value(value)?;
@@ -100,13 +101,11 @@ impl Runtime {
 
     fn evaluate_value(&mut self, value: &crate::ir::IRValue) -> Result<Box<dyn Any>> {
         match value {
-            crate::ir::IRValue::Constant(constant) => match constant {
-                crate::ir::IRConstant::Integer(i) => Ok(Box::new(*i)),
-                crate::ir::IRConstant::Float(f) => Ok(Box::new(*f)),
-                crate::ir::IRConstant::String(s) => Ok(Box::new(s.clone())),
-                crate::ir::IRConstant::Boolean(b) => Ok(Box::new(*b)),
-                crate::ir::IRConstant::Unit => Ok(Box::new(())),
-            },
+            crate::ir::IRValue::Int(i) => Ok(Box::new(*i)),
+            crate::ir::IRValue::Float(f) => Ok(Box::new(*f)),
+            crate::ir::IRValue::Bool(b) => Ok(Box::new(*b)),
+            crate::ir::IRValue::String(s) => Ok(Box::new(s.clone())),
+            crate::ir::IRValue::Null => Ok(Box::new(())),
             crate::ir::IRValue::Variable(name) => {
                 self.memory_manager.get_value(name).ok_or_else(|| {
                     SlangError::Runtime(format!("Variable not found: {}", name))
@@ -128,9 +127,9 @@ impl Runtime {
                     .collect::<Result<Vec<_>>>()?;
                 self.execute_function_call(function, args)
             }
-            crate::ir::IRValue::Assignment { target, value } => {
+            crate::ir::IRValue::Assignment { name, value } => {
                 let value = self.evaluate_value(value)?;
-                self.memory_manager.heap.insert(target.clone(), value);
+                self.memory_manager.heap.insert(name.clone(), value);
                 Ok(Box::new(()))
             }
         }
