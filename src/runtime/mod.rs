@@ -65,11 +65,15 @@ impl Runtime {
                 Ok(())
             }
             crate::ir::IRInstruction::Call { dest, function, arguments } => {
+                let func = self.evaluate_value(function)?;
                 let args = arguments.iter()
                     .map(|arg| self.evaluate_value(arg))
                     .collect::<Result<Vec<_>>>()?;
-                let result = self.execute_function_call(function, args)?;
-                self.memory_manager.heap.insert(dest.clone(), result);
+
+                if let Some(f) = func.downcast_ref::<Box<dyn Fn(&[Box<dyn Any>]) -> Result<Box<dyn Any>>>>() {
+                    let result = f(&args)?;
+                    self.memory_manager.heap.insert(dest.clone(), result);
+                }
                 Ok(())
             }
             crate::ir::IRInstruction::Return(value) => {
@@ -111,36 +115,21 @@ impl Runtime {
 
     fn evaluate_value(&mut self, value: &crate::ir::IRValue) -> Result<Box<dyn Any>> {
         match value {
-            crate::ir::IRValue::Int(i) => Ok(Box::new(*i)),
+            crate::ir::IRValue::Integer(i) => Ok(Box::new(*i)),
             crate::ir::IRValue::Float(f) => Ok(Box::new(*f)),
-            crate::ir::IRValue::Bool(b) => Ok(Box::new(*b)),
+            crate::ir::IRValue::Boolean(b) => Ok(Box::new(*b)),
             crate::ir::IRValue::String(s) => Ok(Box::new(s.clone())),
-            crate::ir::IRValue::Null => Ok(Box::new(())),
             crate::ir::IRValue::Variable(name) => {
                 self.memory_manager.get_value(name)
-                    .map(|v| v.clone())
+                    .map(|v| Box::new(v.clone()))
                     .ok_or_else(|| SlangError::Runtime(format!("Variable not found: {}", name)))
             }
-            crate::ir::IRValue::BinaryOp { left, op, right } => {
-                let left = self.evaluate_value(left)?;
-                let right = self.evaluate_value(right)?;
-                self.execute_binary_op(op, left, right)
-            }
-            crate::ir::IRValue::UnaryOp { op, expr } => {
-                let expr = self.evaluate_value(expr)?;
-                self.execute_unary_op(op, expr)
-            }
-            crate::ir::IRValue::Call { function, arguments } => {
-                let args = arguments
-                    .iter()
-                    .map(|arg| self.evaluate_value(arg))
-                    .collect::<Result<Vec<_>>>()?;
-                self.execute_function_call(function, args)
-            }
-            crate::ir::IRValue::Assignment { name, value } => {
-                let value = self.evaluate_value(value)?;
-                self.memory_manager.heap.insert(name.clone(), value);
-                Ok(Box::new(()))
+            crate::ir::IRValue::Function(name) => {
+                if let Some(func) = self.standard_library.get_function(name) {
+                    Ok(Box::new(func.clone()))
+                } else {
+                    Err(SlangError::Runtime(format!("Function not found: {}", name)))
+                }
             }
         }
     }
@@ -371,18 +360,6 @@ impl Runtime {
                 }
             }
             _ => todo!(),
-        }
-    }
-
-    fn execute_function_call(
-        &mut self,
-        function: &str,
-        arguments: Vec<Box<dyn Any>>,
-    ) -> Result<Box<dyn Any>> {
-        if let Some(func) = self.standard_library.get_function(function) {
-            func(&arguments)
-        } else {
-            Err(SlangError::Runtime(format!("Function not found: {}", function)))
         }
     }
 }

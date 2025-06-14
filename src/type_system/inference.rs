@@ -7,6 +7,7 @@ use std::collections::HashMap;
 pub struct TypeInference {
     type_vars: HashMap<String, Type>,
     constraints: Vec<TypeConstraint>,
+    type_definitions: HashMap<String, TypeDefinition>,
 }
 
 #[derive(Debug, Clone)]
@@ -20,6 +21,7 @@ impl TypeInference {
         Self {
             type_vars: HashMap::new(),
             constraints: Vec::new(),
+            type_definitions: HashMap::new(),
         }
     }
 
@@ -63,6 +65,7 @@ impl TypeInference {
 
         let struct_type = Type::Named(type_name);
         self.type_vars.insert(type_def.name.clone(), struct_type);
+        self.type_definitions.insert(type_def.name.clone(), type_def.clone());
 
         Ok(())
     }
@@ -251,7 +254,7 @@ impl TypeInference {
             Pattern::Struct { name: _, fields } => {
                 if let Type::Named(type_name) = value_type {
                     if let Some(type_def) = self.type_vars.get(type_name) {
-                        let field_types = self.get_field_types(type_def)?;
+                        let field_types = self.get_field_types(type_name)?;
                         for field in fields {
                             if let Some(field_type) = field_types.get(&field.name) {
                                 self.infer_pattern(&field.pattern, field_type)?;
@@ -270,22 +273,16 @@ impl TypeInference {
         Ok(())
     }
 
-    fn get_field_types(&self, type_def: &Type) -> Result<HashMap<String, Type>> {
-        let mut field_types = HashMap::new();
-        if let Type::Named(name) = type_def {
-            if let Some(type_def) = self.type_vars.get(name) {
-                if let Type::Named(type_name) = type_def {
-                    if let Some(type_def) = self.type_vars.get(type_name) {
-                        if let Type::Named(fields) = type_def {
-                            for field in fields {
-                                field_types.insert(field.name.clone(), field.type_annotation.clone());
-                            }
-                        }
-                    }
-                }
+    fn get_field_types(&self, type_name: &str) -> Option<HashMap<String, Type>> {
+        if let Some(type_def) = self.type_definitions.get(type_name) {
+            let mut field_types = HashMap::new();
+            for (field_name, field_type) in &type_def.fields {
+                field_types.insert(field_name.clone(), field_type.clone());
             }
+            Some(field_types)
+        } else {
+            None
         }
-        Ok(field_types)
     }
 
     fn add_constraint(&mut self, left: Type, right: Type) -> Result<()> {

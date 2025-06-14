@@ -322,4 +322,23 @@ impl TypeChecker {
         }
         Ok(())
     }
+
+    fn check_struct_pattern(&mut self, name: &str, fields: &[StructFieldPattern]) -> Result<()> {
+        if let Some(type_def) = self.type_definitions.get(name) {
+            let field_types: HashMap<_, _> = type_def.fields.iter()
+                .map(|(name, type_)| (name.clone(), type_.clone()))
+                .collect();
+
+            for field in fields {
+                if let Some(field_type) = field_types.get(&field.name) {
+                    self.check_pattern(&field.pattern, field_type.clone())?;
+                } else {
+                    return Err(SlangError::Type(format!("Field '{}' not found in struct '{}'", field.name, name)));
+                }
+            }
+            Ok(())
+        } else {
+            Err(SlangError::Type(format!("Type '{}' not found", name)))
+        }
+    }
 } 
