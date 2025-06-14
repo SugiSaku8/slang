@@ -248,31 +248,44 @@ impl TypeInference {
                 let lit_type = self.infer_literal(lit);
                 self.add_constraint(lit_type, value_type.clone())?;
             }
-            Pattern::Wildcard => {}
-            Pattern::Tuple(patterns) => {
-                if let Type::Tuple(types) = value_type {
-                    if patterns.len() != types.len() {
-                        return Err(SlangError::Type("Pattern length mismatch".to_string()));
-                    }
-                    for (pattern, type_) in patterns.iter().zip(types.iter()) {
-                        self.infer_pattern(pattern, type_)?;
-                    }
-                } else {
-                    return Err(SlangError::Type("Expected tuple type".to_string()));
-                }
-            }
-            Pattern::Struct { name, fields } => {
+            Pattern::Struct { name: _, fields } => {
                 if let Type::Named(type_name) = value_type {
-                    if name != type_name {
-                        return Err(SlangError::Type("Struct name mismatch".to_string()));
+                    if let Some(type_def) = self.type_vars.get(type_name) {
+                        let field_types = self.get_field_types(type_def)?;
+                        for field in fields {
+                            if let Some(field_type) = field_types.get(&field.name) {
+                                self.infer_pattern(&field.pattern, field_type)?;
+                            } else {
+                                return Err(SlangError::Type(format!("Field not found: {}", field.name)));
+                            }
+                        }
+                    } else {
+                        return Err(SlangError::Type(format!("Type not found: {}", type_name)));
                     }
-                    // フィールドの型チェックは型定義から取得する必要がある
                 } else {
-                    return Err(SlangError::Type("Expected struct type".to_string()));
+                    return Err(SlangError::Type("Pattern matching requires a struct type".to_string()));
                 }
             }
         }
         Ok(())
+    }
+
+    fn get_field_types(&self, type_def: &Type) -> Result<HashMap<String, Type>> {
+        let mut field_types = HashMap::new();
+        if let Type::Named(name) = type_def {
+            if let Some(type_def) = self.type_vars.get(name) {
+                if let Type::Named(type_name) = type_def {
+                    if let Some(type_def) = self.type_vars.get(type_name) {
+                        if let Type::Named(fields) = type_def {
+                            for field in fields {
+                                field_types.insert(field.name.clone(), field.type_annotation.clone());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(field_types)
     }
 
     fn add_constraint(&mut self, left: Type, right: Type) -> Result<()> {
@@ -281,17 +294,15 @@ impl TypeInference {
     }
 
     fn solve_constraints(&mut self) -> Result<()> {
-        let mut changed = true;
-        while changed {
-            changed = false;
+        let mut constraints = std::mem::take(&mut self.constraints);
+        while !constraints.is_empty() {
             let mut new_constraints = Vec::new();
-            for constraint in &self.constraints {
+            for constraint in constraints {
                 if let Some(new_constraint) = self.unify(&constraint.left, &constraint.right)? {
                     new_constraints.push(new_constraint);
-                    changed = true;
                 }
             }
-            self.constraints.extend(new_constraints);
+            constraints = new_constraints;
         }
         Ok(())
     }

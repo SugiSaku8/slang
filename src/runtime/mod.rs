@@ -38,26 +38,31 @@ impl Runtime {
         match instruction {
             crate::ir::IRInstruction::Alloca { name, type_annotation: _ } => {
                 self.memory_manager.heap.insert(name.clone(), Box::new(()));
+                Ok(())
             }
             crate::ir::IRInstruction::Store { name, value } => {
                 let value = self.evaluate_value(value)?;
                 self.memory_manager.heap.insert(name.clone(), value);
+                Ok(())
             }
             crate::ir::IRInstruction::Load { name } => {
                 if !self.memory_manager.heap.contains_key(name) {
                     return Err(SlangError::Runtime(format!("Undefined variable: {}", name)));
                 }
+                Ok(())
             }
             crate::ir::IRInstruction::BinaryOp { dest, op, left, right } => {
                 let left_value = self.evaluate_value(left)?;
                 let right_value = self.evaluate_value(right)?;
                 let result = self.execute_binary_op(op, left_value, right_value)?;
                 self.memory_manager.heap.insert(dest.clone(), result);
+                Ok(())
             }
             crate::ir::IRInstruction::UnaryOp { dest, op, expr } => {
                 let value = self.evaluate_value(expr)?;
                 let result = self.execute_unary_op(op, value)?;
                 self.memory_manager.heap.insert(dest.clone(), result);
+                Ok(())
             }
             crate::ir::IRInstruction::Call { dest, function, arguments } => {
                 let args = arguments.iter()
@@ -65,15 +70,18 @@ impl Runtime {
                     .collect::<Result<Vec<_>>>()?;
                 let result = self.execute_function_call(function, args)?;
                 self.memory_manager.heap.insert(dest.clone(), result);
+                Ok(())
             }
             crate::ir::IRInstruction::Return(value) => {
                 if let Some(value) = value {
                     let value = self.evaluate_value(value)?;
                     println!("Return value: {:?}", value);
                 }
+                Ok(())
             }
             crate::ir::IRInstruction::Branch { label } => {
                 // self.current_block = label.clone(); // Remove or comment out
+                Ok(())
             }
             crate::ir::IRInstruction::ConditionalBranch { condition, then_label, else_label } => {
                 let cond = self.evaluate_value(condition)?;
@@ -82,21 +90,23 @@ impl Runtime {
                 } else {
                     return Err(SlangError::Runtime("Condition must be boolean".to_string()));
                 }
+                Ok(())
             }
-            crate::ir::IRInstruction::Assignment { name, value } => {
+            crate::ir::IRInstruction::Assignment { target, value } => {
                 let value = self.evaluate_value(value)?;
-                self.memory_manager.heap.insert(name.clone(), value);
-                Ok(Box::new(()))
+                self.memory_manager.heap.insert(target.clone(), value);
+                Ok(())
             }
             crate::ir::IRInstruction::Expression(value) => {
                 self.evaluate_value(value)?;
+                Ok(())
             }
             crate::ir::IRInstruction::Let { name, value } => {
                 let value = self.evaluate_value(value)?;
                 self.memory_manager.heap.insert(name.clone(), value);
+                Ok(())
             }
         }
-        Ok(())
     }
 
     fn evaluate_value(&mut self, value: &crate::ir::IRValue) -> Result<Box<dyn Any>> {
@@ -107,9 +117,9 @@ impl Runtime {
             crate::ir::IRValue::String(s) => Ok(Box::new(s.clone())),
             crate::ir::IRValue::Null => Ok(Box::new(())),
             crate::ir::IRValue::Variable(name) => {
-                self.memory_manager.get_value(name).ok_or_else(|| {
-                    SlangError::Runtime(format!("Variable not found: {}", name))
-                })
+                self.memory_manager.get_value(name)
+                    .map(|v| v.clone())
+                    .ok_or_else(|| SlangError::Runtime(format!("Variable not found: {}", name)))
             }
             crate::ir::IRValue::BinaryOp { left, op, right } => {
                 let left = self.evaluate_value(left)?;

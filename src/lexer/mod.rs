@@ -4,20 +4,20 @@ use std::ops::Range;
 #[derive(Logos, Debug, PartialEq, Clone)]
 pub enum Token {
     // 識別子
-    #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", priority = 2)]
+    #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice().to_string(), priority = 2)]
     Identifier(String),
 
     // リテラル
-    #[regex(r"[0-9]+")]
+    #[regex(r"[0-9]+", |lex| lex.slice().parse::<i64>().unwrap())]
     IntegerLiteral(i64),
 
-    #[regex(r"[0-9]+\.[0-9]+")]
+    #[regex(r"[0-9]+\.[0-9]+", |lex| lex.slice().parse::<f64>().unwrap())]
     FloatLiteral(f64),
 
-    #[regex(r#""([^"\\]|\\t|\\u|\\n|\\")*""#)]
+    #[regex(r#""([^"\\]|\\t|\\u|\\n|\\")*""#, |lex| lex.slice()[1..lex.slice().len()-1].to_string())]
     StringLiteral(String),
 
-    #[regex(r"'([^'\\]|\\t|\\u|\\n|\\')'")]
+    #[regex(r"'([^'\\]|\\t|\\u|\\n|\\')'", |lex| lex.slice().chars().nth(1).unwrap())]
     CharLiteral(char),
 
     // キーワード

@@ -50,9 +50,9 @@ impl Compiler {
         // 関数本体をコンパイル
         for statement in &function.body.statements {
             match statement {
-                Statement::Let(LetStatement { name, value, type_annotation: _ }) => {
+                Statement::Let(LetStatement { name, value, type_annotation }) => {
                     let value = self.compile_expression(value)?;
-                    ir_function.blocks[0].instructions.push(IRInstruction::Store {
+                    ir_function.blocks[0].instructions.push(IRInstruction::Let {
                         name: name.clone(),
                         value,
                     });
@@ -87,15 +87,39 @@ impl Compiler {
                 let left_value = self.compile_expression(&expr.left)?;
                 let right_value = self.compile_expression(&expr.right)?;
                 Ok(IRValue::BinaryOp {
-                    op: expr.op.clone(),
                     left: Box::new(left_value),
+                    op: match expr.op {
+                        BinaryOperator::Add => IRBinaryOperator::Add,
+                        BinaryOperator::Sub => IRBinaryOperator::Sub,
+                        BinaryOperator::Mul => IRBinaryOperator::Mul,
+                        BinaryOperator::Div => IRBinaryOperator::Div,
+                        BinaryOperator::Mod => IRBinaryOperator::Mod,
+                        BinaryOperator::Eq => IRBinaryOperator::Eq,
+                        BinaryOperator::Neq => IRBinaryOperator::Neq,
+                        BinaryOperator::Lt => IRBinaryOperator::Lt,
+                        BinaryOperator::Lte => IRBinaryOperator::Lte,
+                        BinaryOperator::Gt => IRBinaryOperator::Gt,
+                        BinaryOperator::Gte => IRBinaryOperator::Gte,
+                        BinaryOperator::And => IRBinaryOperator::And,
+                        BinaryOperator::Or => IRBinaryOperator::Or,
+                        BinaryOperator::Equals => IRBinaryOperator::Equals,
+                        BinaryOperator::NotEquals => IRBinaryOperator::NotEquals,
+                        BinaryOperator::LessThan => IRBinaryOperator::LessThan,
+                        BinaryOperator::GreaterThan => IRBinaryOperator::GreaterThan,
+                        BinaryOperator::LessThanEquals => IRBinaryOperator::LessThanEquals,
+                        BinaryOperator::GreaterThanEquals => IRBinaryOperator::GreaterThanEquals,
+                    },
                     right: Box::new(right_value),
                 })
             }
             Expression::UnaryOp(expr) => {
                 let expr_value = self.compile_expression(&expr.right)?;
                 Ok(IRValue::UnaryOp {
-                    op: expr.op.clone(),
+                    op: match expr.op {
+                        UnaryOperator::Neg => IRUnaryOperator::Neg,
+                        UnaryOperator::Not => IRUnaryOperator::Not,
+                        UnaryOperator::Negate => IRUnaryOperator::Negate,
+                    },
                     expr: Box::new(expr_value),
                 })
             }

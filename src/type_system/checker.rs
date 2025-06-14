@@ -196,14 +196,22 @@ impl TypeChecker {
                     Err(SlangError::Type("Numeric operation requires numeric operands".to_string()))
                 }
             }
-            BinaryOperator::Eq | BinaryOperator::Neq => {
+            BinaryOperator::Mod => {
+                if left.is_numeric() && right.is_numeric() {
+                    Ok(Type::Int)
+                } else {
+                    Err(SlangError::Type("Modulo operation requires numeric operands".to_string()))
+                }
+            }
+            BinaryOperator::Eq | BinaryOperator::Neq | BinaryOperator::Equals | BinaryOperator::NotEquals => {
                 if left.is_compatible_with(&right) {
                     Ok(Type::Bool)
                 } else {
                     Err(SlangError::Type("Cannot compare incompatible types".to_string()))
                 }
             }
-            BinaryOperator::Lt | BinaryOperator::Lte | BinaryOperator::Gt | BinaryOperator::Gte => {
+            BinaryOperator::Lt | BinaryOperator::Lte | BinaryOperator::Gt | BinaryOperator::Gte |
+            BinaryOperator::LessThan | BinaryOperator::LessThanEquals | BinaryOperator::GreaterThan | BinaryOperator::GreaterThanEquals => {
                 if left.is_numeric() && right.is_numeric() {
                     Ok(Type::Bool)
                 } else {
@@ -222,7 +230,7 @@ impl TypeChecker {
 
     fn check_unary_operation(&mut self, op: &UnaryOperator, expr: Type) -> Result<Type> {
         match op {
-            UnaryOperator::Neg => {
+            UnaryOperator::Neg | UnaryOperator::Negate => {
                 if expr.is_numeric() {
                     Ok(expr)
                 } else {

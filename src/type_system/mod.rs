@@ -3,6 +3,7 @@ use std::fmt;
 
 use crate::ast::*;
 use crate::error::Result;
+use crate::error::SlangError;
 
 mod inference;
 mod cast;
