@@ -225,6 +225,17 @@ impl TypeChecker {
                     Err(SlangError::Type("Logical operation requires boolean operands".to_string()))
                 }
             }
+            BinaryOperator::Divide | BinaryOperator::Modulo => {
+                if left.is_numeric() && right.is_numeric() {
+                    if left == Type::Float || right == Type::Float {
+                        Ok(Type::Float)
+                    } else {
+                        Ok(Type::Int)
+                    }
+                } else {
+                    Err(SlangError::Type("Numeric operation requires numeric operands".to_string()))
+                }
+            }
         }
     }
 
@@ -270,6 +281,7 @@ impl TypeChecker {
         match pattern {
             Pattern::Identifier(name) => {
                 self.type_vars.insert(name.clone(), value_type.clone());
+                Ok(())
             }
             Pattern::Literal(lit) => {
                 let lit_type = self.get_literal_type(lit);
@@ -279,54 +291,53 @@ impl TypeChecker {
                         value_type, lit_type
                     )));
                 }
+                Ok(())
             }
-            Pattern::Wildcard => {}
+            Pattern::Wildcard => Ok(()),
             Pattern::Tuple(patterns) => {
                 if let Type::Tuple(types) = value_type {
                     if patterns.len() != types.len() {
-                        return Err(SlangError::Type("Pattern length mismatch".to_string()));
+                        return Err(SlangError::Type(format!(
+                            "Tuple pattern length mismatch: expected {}, got {}",
+                            types.len(), patterns.len()
+                        )));
                     }
                     for (pattern, type_) in patterns.iter().zip(types.iter()) {
                         self.check_pattern(pattern, type_)?;
                     }
+                    Ok(())
                 } else {
-                    return Err(SlangError::Type("Expected tuple type".to_string()));
+                    Err(SlangError::Type("Expected tuple type".to_string()))
                 }
             }
             Pattern::Struct { name, fields } => {
-                if let Type::Named(type_name) = value_type {
-                    if name != type_name {
-                        return Err(SlangError::Type("Struct name mismatch".to_string()));
-                    }
-                    if let Some(type_def) = self.type_definitions.get(name) {
-                        for field in fields {
-                            if let Some(field_type) = type_def.fields.iter()
-                                .find(|f| f.name == field.name)
-                                .map(|f| &f.type_annotation)
-                            {
-                                self.check_pattern(&field.pattern, field_type)?;
-                            } else {
-                                return Err(SlangError::Type(format!(
-                                    "Unknown field: {} in struct {}",
-                                    field.name, name
-                                )));
-                            }
+                if let Some(type_def) = self.type_definitions.get(name) {
+                    let mut field_types = type_def.fields.clone();
+                    for field in fields {
+                        if let Some(field_type) = field_types.iter()
+                            .find(|f| f.name == field.name)
+                            .map(|f| f.type_.clone())
+                        {
+                            self.check_pattern(&field.pattern, &field_type)?;
+                        } else {
+                            return Err(SlangError::Type(format!(
+                                "Unknown field: {} in type {}",
+                                field.name, name
+                            )));
                         }
-                    } else {
-                        return Err(SlangError::Type(format!("Unknown struct type: {}", name)));
                     }
+                    Ok(())
                 } else {
-                    return Err(SlangError::Type("Expected struct type".to_string()));
+                    Err(SlangError::Type(format!("Unknown type: {}", name)))
                 }
             }
         }
-        Ok(())
     }
 
-    fn check_struct_pattern(&mut self, name: &str, fields: &[StructFieldPattern]) -> Result<()> {
+    fn check_struct_pattern(&mut self, name: &str, fields: &[FieldPattern]) -> Result<()> {
         if let Some(type_def) = self.type_definitions.get(name) {
             let field_types: HashMap<_, _> = type_def.fields.iter()
-                .map(|(name, type_)| (name.clone(), type_.clone()))
+                .map(|field| (field.name.clone(), field.type_annotation.clone()))
                 .collect();
 
             for field in fields {

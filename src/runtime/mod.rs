@@ -115,21 +115,35 @@ impl Runtime {
 
     fn evaluate_value(&mut self, value: &crate::ir::IRValue) -> Result<Box<dyn Any>> {
         match value {
-            crate::ir::IRValue::Integer(i) => Ok(Box::new(*i)),
+            crate::ir::IRValue::Int(i) => Ok(Box::new(*i)),
             crate::ir::IRValue::Float(f) => Ok(Box::new(*f)),
-            crate::ir::IRValue::Boolean(b) => Ok(Box::new(*b)),
+            crate::ir::IRValue::Bool(b) => Ok(Box::new(*b)),
             crate::ir::IRValue::String(s) => Ok(Box::new(s.clone())),
+            crate::ir::IRValue::Null => Ok(Box::new(())),
             crate::ir::IRValue::Variable(name) => {
                 self.memory_manager.get_value(name)
-                    .map(|v| Box::new(v.clone()))
+                    .map(|v| v.clone())
                     .ok_or_else(|| SlangError::Runtime(format!("Variable not found: {}", name)))
             }
-            crate::ir::IRValue::Function(name) => {
-                if let Some(func) = self.standard_library.get_function(name) {
-                    Ok(Box::new(func.clone()))
-                } else {
-                    Err(SlangError::Runtime(format!("Function not found: {}", name)))
-                }
+            crate::ir::IRValue::BinaryOp { left, op, right } => {
+                let left_value = self.evaluate_value(left)?;
+                let right_value = self.evaluate_value(right)?;
+                self.execute_binary_op(op, left_value, right_value)
+            }
+            crate::ir::IRValue::UnaryOp { op, expr } => {
+                let value = self.evaluate_value(expr)?;
+                self.execute_unary_op(op, value)
+            }
+            crate::ir::IRValue::Call { function, arguments } => {
+                let arg_values = arguments.iter()
+                    .map(|arg| self.evaluate_value(arg))
+                    .collect::<Result<Vec<_>>>()?;
+                self.execute_function_call(function, &arg_values)
+            }
+            crate::ir::IRValue::Assignment { name, value } => {
+                let value = self.evaluate_value(value)?;
+                self.memory_manager.heap.insert(name.clone(), value.clone());
+                Ok(value)
             }
         }
     }

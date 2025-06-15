@@ -246,42 +246,49 @@ impl TypeInference {
         match pattern {
             Pattern::Identifier(name) => {
                 self.type_vars.insert(name.clone(), value_type.clone());
+                Ok(())
             }
-            Pattern::Literal(lit) => {
-                let lit_type = self.infer_literal(lit);
-                self.add_constraint(lit_type, value_type.clone())?;
-            }
-            Pattern::Struct { name: _, fields } => {
+            Pattern::Struct { name, fields } => {
                 if let Type::Named(type_name) = value_type {
-                    if let Some(type_def) = self.type_vars.get(type_name) {
-                        let field_types = self.get_field_types(type_name)?;
-                        for field in fields {
-                            if let Some(field_type) = field_types.get(&field.name) {
-                                self.infer_pattern(&field.pattern, field_type)?;
-                            } else {
-                                return Err(SlangError::Type(format!("Field not found: {}", field.name)));
-                            }
+                    let field_types = self.get_field_types(type_name)?;
+                    for field in fields {
+                        if let Some(field_type) = field_types.get(&field.name) {
+                            self.infer_pattern(&field.pattern, field_type)?;
+                        } else {
+                            return Err(SlangError::Type(format!("Field '{}' not found in struct '{}'", field.name, name)));
                         }
-                    } else {
-                        return Err(SlangError::Type(format!("Type not found: {}", type_name)));
                     }
+                    Ok(())
                 } else {
-                    return Err(SlangError::Type("Pattern matching requires a struct type".to_string()));
+                    Err(SlangError::Type(format!("Expected struct type, got {}", value_type)))
+                }
+            }
+            Pattern::Wildcard => Ok(()),
+            Pattern::Tuple(patterns) => {
+                if let Type::Tuple(types) = value_type {
+                    if patterns.len() != types.len() {
+                        return Err(SlangError::Type(format!("Expected {} tuple elements, got {}", types.len(), patterns.len())));
+                    }
+                    for (pattern, type_) in patterns.iter().zip(types.iter()) {
+                        self.infer_pattern(pattern, type_)?;
+                    }
+                    Ok(())
+                } else {
+                    Err(SlangError::Type(format!("Expected tuple type, got {}", value_type)))
                 }
             }
         }
-        Ok(())
     }
 
-    fn get_field_types(&self, type_name: &str) -> Option<HashMap<String, Type>> {
+    fn get_field_types(&self, type_name: &str) -> Result<HashMap<String, Type>> {
         if let Some(type_def) = self.type_definitions.get(type_name) {
             let mut field_types = HashMap::new();
-            for (field_name, field_type) in &type_def.fields {
-                field_types.insert(field_name.clone(), field_type.clone());
+            for field in &type_def.fields {
+                field_types.insert(field.name.clone(), field.type_annotation.clone());
             }
-            Some(field_types)
+            Ok(field_types)
         } else {
-            None
+            Err(SlangError::Type(format!("Type '{}' not found", type_name)))
         }
     }
 

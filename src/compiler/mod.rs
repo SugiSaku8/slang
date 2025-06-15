@@ -108,6 +108,8 @@ impl Compiler {
                         BinaryOperator::GreaterThan => IRBinaryOperator::GreaterThan,
                         BinaryOperator::LessThanEquals => IRBinaryOperator::LessThanEquals,
                         BinaryOperator::GreaterThanEquals => IRBinaryOperator::GreaterThanEquals,
+                        BinaryOperator::Divide => IRBinaryOperator::Divide,
+                        BinaryOperator::Modulo => IRBinaryOperator::Modulo,
                     },
                     right: Box::new(right_value),
                 })
