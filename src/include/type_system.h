@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stddef.h>
 
 // Forward declarations
 typedef struct Vector Vector;
@@ -29,41 +30,41 @@ typedef enum {
 } TypeKind;
 
 // Type structure
-typedef struct {
+typedef struct Type {
     TypeKind kind;
     union {
         struct {
-            Type* element_type;
+            struct Type* element_type;
         } array;
         struct {
             Vector* types;
         } tuple;
         struct {
             size_t dimension;
-            Type* element_type;
+            struct Type* element_type;
         } vector;
         struct {
             size_t rows;
             size_t columns;
-            Type* element_type;
+            struct Type* element_type;
         } matrix;
         struct {
             Vector* dimensions;
-            Type* element_type;
+            struct Type* element_type;
         } tensor;
         struct {
-            Type* element_type;
+            struct Type* element_type;
         } quaternion;
         struct {
-            Type* element_type;
+            struct Type* element_type;
         } complex;
         struct {
             Vector* params;
-            Type* return_type;
+            struct Type* return_type;
             uint32_t* priority;
         } function;
         struct {
-            Type* inner_type;
+            struct Type* inner_type;
         } pointer;
         struct {
             char* name;
