@@ -1,58 +1,45 @@
-#include "error.h"
+#include "../include/error.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
+// Error type strings
+static const char* error_type_strings[] = {
+    "Syntax error",
+    "Type error",
+    "Compilation error",
+    "Runtime error",
+    "IO error"
+};
+
+// Error creation
 SlangError* slang_error_new(SlangErrorType type, const char* message) {
     SlangError* error = (SlangError*)malloc(sizeof(SlangError));
-    if (error == NULL) {
-        return NULL;
-    }
-
+    if (!error) return NULL;
     error->type = type;
     error->message = strdup(message);
-    if (error->message == NULL) {
+    if (!error->message) {
         free(error);
         return NULL;
     }
-
     return error;
 }
 
+// Error destruction
 void slang_error_free(SlangError* error) {
-    if (error != NULL) {
-        free(error->message);
-        free(error);
-    }
+    if (!error) return;
+    free(error->message);
+    free(error);
 }
 
+// Error to string
 const char* slang_error_to_string(const SlangError* error) {
-    if (error == NULL) {
-        return "No error";
-    }
-
+    if (!error) return "Unknown error";
     static char buffer[1024];
-    const char* type_str;
-
-    switch (error->type) {
-        case SLANG_ERROR_SYNTAX:
-            type_str = "Syntax error";
-            break;
-        case SLANG_ERROR_TYPE:
-            type_str = "Type error";
-            break;
-        case SLANG_ERROR_COMPILATION:
-            type_str = "Compilation error";
-            break;
-        case SLANG_ERROR_RUNTIME:
-            type_str = "Runtime error";
-            break;
-        case SLANG_ERROR_IO:
-            type_str = "IO error";
-            break;
-        default:
-            type_str = "Unknown error";
+    const char* type_str = "Unknown error";
+    if (error->type >= 0 && error->type < (sizeof(error_type_strings)/sizeof(error_type_strings[0]))) {
+        type_str = error_type_strings[error->type];
     }
-
     snprintf(buffer, sizeof(buffer), "%s: %s", type_str, error->message);
     return buffer;
 } 

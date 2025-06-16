@@ -147,7 +147,7 @@ SlangError* parser_parse_type(Parser* parser, Type* type) {
     
     if (token.type == TOKEN_IDENTIFIER) {
         type->kind = TYPE_NAMED;
-        type->name = strdup(token.value.string);
+        type->named.name = strdup(token.value.string);
         lexer_next_token(parser->lexer);
         return NULL;
     }
@@ -155,8 +155,8 @@ SlangError* parser_parse_type(Parser* parser, Type* type) {
     if (token.type == TOKEN_LBRACKET) {
         lexer_next_token(parser->lexer);
         type->kind = TYPE_ARRAY;
-        type->element_type = (Type*)malloc(sizeof(Type));
-        SlangError* error = parser_parse_type(parser, type->element_type);
+        type->array.element_type = (Type*)malloc(sizeof(Type));
+        SlangError* error = parser_parse_type(parser, type->array.element_type);
         if (error != NULL) {
             return error;
         }
@@ -166,7 +166,7 @@ SlangError* parser_parse_type(Parser* parser, Type* type) {
     if (token.type == TOKEN_LPAREN) {
         lexer_next_token(parser->lexer);
         type->kind = TYPE_TUPLE;
-        type->tuple_types = vector_new(sizeof(Type));
+        type->tuple.types = vector_new(sizeof(Type));
         
         token = lexer_peek_token(parser->lexer);
         if (token.type != TOKEN_RPAREN) {
@@ -174,10 +174,10 @@ SlangError* parser_parse_type(Parser* parser, Type* type) {
                 Type element_type;
                 SlangError* error = parser_parse_type(parser, &element_type);
                 if (error != NULL) {
-                    vector_free(type->tuple_types);
+                    vector_free(type->tuple.types);
                     return error;
                 }
-                vector_push(type->tuple_types, &element_type);
+                vector_push(type->tuple.types, &element_type);
                 
                 token = lexer_peek_token(parser->lexer);
                 if (token.type == TOKEN_RPAREN) {
@@ -186,7 +186,7 @@ SlangError* parser_parse_type(Parser* parser, Type* type) {
                 
                 error = parser_expect(parser, TOKEN_COMMA);
                 if (error != NULL) {
-                    vector_free(type->tuple_types);
+                    vector_free(type->tuple.types);
                     return error;
                 }
             }

@@ -35,106 +35,10 @@ void pattern_free(Pattern* pattern);
 void expression_free(Expression* expr);
 void literal_free(Literal* literal);
 
-// Block structure
-struct Block {
-    Vector* statements;
-};
-
-// LetStatement structure
-struct LetStatement {
-    char* name;
-    Type* type_annotation;
-    Expression* value;
-};
-
-// ReturnStatement structure
-struct ReturnStatement {
-    Expression* value;
-};
-
-// IfStatement structure
-struct IfStatement {
-    Expression* condition;
-    Block then_block;
-    Block* else_block;
-};
-
-// WhileStatement structure
-struct WhileStatement {
-    Expression* condition;
-    Block body;
-};
-
-// ForStatement structure
-struct ForStatement {
-    char* variable;
-    Expression* iterator;
-    Block body;
-};
-
-// MatchStatement structure
-struct MatchStatement {
-    Expression* expression;
-    Vector* arms;
-};
-
-// MatchArm structure
-struct MatchArm {
-    Pattern pattern;
-    Block body;
-};
-
-// Pattern types
-typedef enum {
-    PATTERN_IDENTIFIER,
-    PATTERN_LITERAL,
-    PATTERN_WILDCARD,
-    PATTERN_TUPLE,
-    PATTERN_STRUCT
-} PatternType;
-
-// Pattern structure
-struct Pattern {
-    PatternType kind;
-    union {
-        char* identifier;
-        Literal literal;
-        Vector* tuple_patterns;
-        struct {
-            char* name;
-            Vector* fields;
-        } struct_pattern;
-    };
-};
-
-// FieldPattern structure
-struct FieldPattern {
-    char* name;
-    Pattern* pattern;
-};
-
-// Expression types
-typedef enum {
-    EXPRESSION_LITERAL,
-    EXPRESSION_IDENTIFIER,
-    EXPRESSION_BINARY_OP,
-    EXPRESSION_UNARY_OP,
-    EXPRESSION_CALL,
-    EXPRESSION_ASSIGNMENT
-} ExpressionType;
-
-// Expression structure
-struct Expression {
-    ExpressionType kind;
-    union {
-        Literal literal;
-        char* identifier;
-        BinaryOpExpression* binary_op;
-        UnaryOpExpression* unary_op;
-        CallExpression* call;
-        AssignmentExpression* assignment;
-    };
-};
+// Vector API
+Vector* vector_new(size_t element_size);
+void vector_free(Vector* vector);
+void* vector_push(Vector* vector, const void* element);
 
 // Literal types
 typedef enum {
@@ -173,23 +77,62 @@ typedef enum {
     BINARY_OP_OR
 } BinaryOperator;
 
-// BinaryOpExpression structure
-struct BinaryOpExpression {
-    Expression* left;
-    BinaryOperator op;
-    Expression* right;
-};
-
 // UnaryOperator types
 typedef enum {
     UNARY_OP_NEG,
     UNARY_OP_NOT
 } UnaryOperator;
 
+// Pattern types
+typedef enum {
+    PATTERN_IDENTIFIER,
+    PATTERN_LITERAL,
+    PATTERN_WILDCARD,
+    PATTERN_TUPLE,
+    PATTERN_STRUCT
+} PatternType;
+
+// Pattern structure
+struct Pattern {
+    PatternType kind;
+    union {
+        char* identifier;
+        struct Literal literal;
+        Vector* tuple_patterns;
+        struct {
+            char* name;
+            Vector* fields;
+        } struct_pattern;
+    };
+};
+
+// FieldPattern structure
+struct FieldPattern {
+    char* name;
+    struct Pattern* pattern;
+};
+
+// Expression types
+typedef enum {
+    EXPRESSION_LITERAL,
+    EXPRESSION_IDENTIFIER,
+    EXPRESSION_BINARY_OP,
+    EXPRESSION_UNARY_OP,
+    EXPRESSION_CALL,
+    EXPRESSION_ASSIGNMENT
+} ExpressionType;
+
+// BinaryOpExpression structure
+struct BinaryOpExpression {
+    struct Expression* left;
+    BinaryOperator op;
+    struct Expression* right;
+};
+
 // UnaryOpExpression structure
 struct UnaryOpExpression {
     UnaryOperator op;
-    Expression* right;
+    struct Expression* right;
 };
 
 // CallExpression structure
@@ -201,7 +144,69 @@ struct CallExpression {
 // AssignmentExpression structure
 struct AssignmentExpression {
     char* target;
-    Expression* value;
+    struct Expression* value;
+};
+
+// Expression structure
+struct Expression {
+    ExpressionType kind;
+    union {
+        struct Literal literal;
+        char* identifier;
+        struct BinaryOpExpression* binary_op;
+        struct UnaryOpExpression* unary_op;
+        struct CallExpression* call;
+        struct AssignmentExpression* assignment;
+    };
+};
+
+// Block structure
+struct Block {
+    Vector* statements;
+};
+
+// LetStatement structure
+struct LetStatement {
+    char* name;
+    Type* type_annotation;
+    struct Expression* value;
+};
+
+// ReturnStatement structure
+struct ReturnStatement {
+    struct Expression* value;
+};
+
+// IfStatement structure
+struct IfStatement {
+    struct Expression* condition;
+    struct Block then_block;
+    struct Block* else_block;
+};
+
+// WhileStatement structure
+struct WhileStatement {
+    struct Expression* condition;
+    struct Block body;
+};
+
+// ForStatement structure
+struct ForStatement {
+    char* variable;
+    struct Expression* iterator;
+    struct Block body;
+};
+
+// MatchStatement structure
+struct MatchStatement {
+    struct Expression* expression;
+    Vector* arms;
+};
+
+// MatchArm structure
+struct MatchArm {
+    struct Pattern pattern;
+    struct Block body;
 };
 
 // Statement types
@@ -219,23 +224,14 @@ typedef enum {
 struct Statement {
     StatementType kind;
     union {
-        LetStatement let_statement;
-        ReturnStatement return_statement;
-        IfStatement if_statement;
-        WhileStatement while_statement;
-        ForStatement for_statement;
-        MatchStatement match_statement;
-        Expression expression_statement;
+        struct LetStatement let_statement;
+        struct ReturnStatement return_statement;
+        struct IfStatement if_statement;
+        struct WhileStatement while_statement;
+        struct ForStatement for_statement;
+        struct MatchStatement match_statement;
+        struct Expression expression_statement;
     };
-};
-
-// Function structure
-struct Function {
-    char* name;
-    Vector* parameters;
-    Type return_type;
-    int32_t priority;
-    Block body;
 };
 
 // Parameter structure
@@ -244,16 +240,25 @@ struct Parameter {
     Type type_annotation;
 };
 
-// TypeDefinition structure
-struct TypeDefinition {
+// Function structure
+struct Function {
     char* name;
-    Vector* fields;
+    Vector* parameters;
+    Type return_type;
+    int32_t priority;
+    struct Block body;
 };
 
 // Field structure
 struct Field {
     char* name;
     Type type_annotation;
+};
+
+// TypeDefinition structure
+struct TypeDefinition {
+    char* name;
+    Vector* fields;
 };
 
 // AST structure
