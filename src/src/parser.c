@@ -403,8 +403,7 @@ SlangError* parser_parse_statement(Parser* parser, Statement* statement) {
     
     // Expression statement
     statement->kind = STATEMENT_EXPRESSION;
-    statement->expression_statement.expression = (Expression*)malloc(sizeof(Expression));
-    SlangError* error = parser_parse_expression(parser, statement->expression_statement.expression);
+    SlangError* error = parser_parse_expression(parser, &statement->expression_statement);
     if (error != NULL) {
         return error;
     }
