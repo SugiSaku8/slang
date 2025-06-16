@@ -1,8 +1,7 @@
-#include "lexer.h"
+#include "../include/lexer.h"
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include <stdio.h>
 
 // Helper functions
 static bool is_whitespace(char c) {
@@ -26,58 +25,69 @@ static bool is_hex_digit(char c) {
 }
 
 // Lexer implementation
-Lexer* lexer_new(const char* source) {
-    Lexer* lexer = (Lexer*)malloc(sizeof(Lexer));
-    if (lexer == NULL) {
-        return NULL;
-    }
-
+Lexer* create_lexer(const char* source) {
+    Lexer* lexer = malloc(sizeof(Lexer));
     lexer->source = source;
-    lexer->position = 0;
-    lexer->length = strlen(source);
-    lexer->current_token.type = TOKEN_EOF;
-    lexer->current_token.start = 0;
-    lexer->current_token.end = 0;
-
+    lexer->start = 0;
+    lexer->current = 0;
+    lexer->line = 1;
+    lexer->column = 1;
     return lexer;
 }
 
-void lexer_free(Lexer* lexer) {
-    if (lexer != NULL) {
-        if (lexer->current_token.type == TOKEN_STRING_LITERAL ||
-            lexer->current_token.type == TOKEN_IDENTIFIER) {
-            free(lexer->current_token.value.string);
-        }
-        free(lexer);
-    }
+void free_lexer(Lexer* lexer) {
+    if (lexer) free(lexer);
+}
+
+bool is_at_end(Lexer* lexer) {
+    return lexer->source[lexer->current] == '\0';
+}
+
+Token next_token(Lexer* lexer) {
+    Token token;
+    token.type = TOKEN_EOF;
+    token.lexeme = "";
+    token.line = lexer->line;
+    token.column = lexer->column;
+    return token;
+}
+
+Token peek_token(Lexer* lexer) {
+    return next_token(lexer);
 }
 
 static void skip_whitespace(Lexer* lexer) {
-    while (lexer->position < lexer->length && is_whitespace(lexer->source[lexer->position])) {
-        lexer->position++;
+    while (lexer->current < strlen(lexer->source) && is_whitespace(lexer->source[lexer->current])) {
+        if (lexer->source[lexer->current] == '\n') {
+            lexer->line++;
+            lexer->column = 1;
+        } else {
+            lexer->column++;
+        }
+        lexer->current++;
     }
 }
 
 static void skip_comment(Lexer* lexer) {
-    if (lexer->position + 1 < lexer->length &&
-        lexer->source[lexer->position] == '/' &&
-        lexer->source[lexer->position + 1] == '/') {
-        lexer->position += 2;
-        while (lexer->position < lexer->length && lexer->source[lexer->position] != '\n') {
-            lexer->position++;
+    if (lexer->current + 1 < strlen(lexer->source) &&
+        lexer->source[lexer->current] == '/' &&
+        lexer->source[lexer->current + 1] == '/') {
+        lexer->current += 2;
+        while (lexer->current < strlen(lexer->source) && lexer->source[lexer->current] != '\n') {
+            lexer->current++;
         }
     }
 }
 
 static Token scan_identifier(Lexer* lexer) {
     Token token;
-    token.start = lexer->position;
+    token.start = lexer->current;
     
-    while (lexer->position < lexer->length && is_identifier_char(lexer->source[lexer->position])) {
-        lexer->position++;
+    while (lexer->current < strlen(lexer->source) && is_identifier_char(lexer->source[lexer->current])) {
+        lexer->current++;
     }
     
-    token.end = lexer->position;
+    token.end = lexer->current;
     size_t length = token.end - token.start;
     char* identifier = (char*)malloc(length + 1);
     strncpy(identifier, lexer->source + token.start, length);
@@ -111,23 +121,23 @@ static Token scan_identifier(Lexer* lexer) {
 
 static Token scan_number(Lexer* lexer) {
     Token token;
-    token.start = lexer->position;
+    token.start = lexer->current;
     bool is_float = false;
     
-    while (lexer->position < lexer->length && is_digit(lexer->source[lexer->position])) {
-        lexer->position++;
+    while (lexer->current < strlen(lexer->source) && is_digit(lexer->source[lexer->current])) {
+        lexer->current++;
     }
     
-    if (lexer->position < lexer->length && lexer->source[lexer->position] == '.') {
+    if (lexer->current < strlen(lexer->source) && lexer->source[lexer->current] == '.') {
         is_float = true;
-        lexer->position++;
+        lexer->current++;
         
-        while (lexer->position < lexer->length && is_digit(lexer->source[lexer->position])) {
-            lexer->position++;
+        while (lexer->current < strlen(lexer->source) && is_digit(lexer->source[lexer->current])) {
+            lexer->current++;
         }
     }
     
-    token.end = lexer->position;
+    token.end = lexer->current;
     size_t length = token.end - token.start;
     char* number_str = (char*)malloc(length + 1);
     strncpy(number_str, lexer->source + token.start, length);
@@ -147,24 +157,24 @@ static Token scan_number(Lexer* lexer) {
 
 static Token scan_string(Lexer* lexer) {
     Token token;
-    token.start = lexer->position;
-    lexer->position++; // Skip opening quote
+    token.start = lexer->current;
+    lexer->current++; // Skip opening quote
     
-    while (lexer->position < lexer->length && lexer->source[lexer->position] != '"') {
-        if (lexer->source[lexer->position] == '\\') {
-            lexer->position++; // Skip escape character
+    while (lexer->current < strlen(lexer->source) && lexer->source[lexer->current] != '"') {
+        if (lexer->source[lexer->current] == '\\') {
+            lexer->current++; // Skip escape character
         }
-        lexer->position++;
+        lexer->current++;
     }
     
-    if (lexer->position >= lexer->length) {
+    if (lexer->current >= strlen(lexer->source)) {
         // Unterminated string
         token.type = TOKEN_EOF;
         return token;
     }
     
-    token.end = lexer->position;
-    lexer->position++; // Skip closing quote
+    token.end = lexer->current;
+    lexer->current++; // Skip closing quote
     
     size_t length = token.end - token.start - 1;
     char* string = (char*)malloc(length + 1);
@@ -180,15 +190,15 @@ Token lexer_next_token(Lexer* lexer) {
     skip_whitespace(lexer);
     skip_comment(lexer);
     
-    if (lexer->position >= lexer->length) {
+    if (lexer->current >= strlen(lexer->source)) {
         Token token;
         token.type = TOKEN_EOF;
-        token.start = lexer->position;
-        token.end = lexer->position;
+        token.start = lexer->current;
+        token.end = lexer->current;
         return token;
     }
     
-    char c = lexer->source[lexer->position];
+    char c = lexer->source[lexer->current];
     
     if (is_identifier_start(c)) {
         return scan_identifier(lexer);
@@ -204,8 +214,8 @@ Token lexer_next_token(Lexer* lexer) {
     
     // Handle single character tokens
     Token token;
-    token.start = lexer->position;
-    token.end = lexer->position + 1;
+    token.start = lexer->current;
+    token.end = lexer->current + 1;
     
     switch (c) {
         case '(': token.type = TOKEN_LPAREN; break;
@@ -228,17 +238,13 @@ Token lexer_next_token(Lexer* lexer) {
         default: token.type = TOKEN_EOF; break;
     }
     
-    lexer->position++;
+    lexer->current++;
     return token;
 }
 
 Token lexer_peek_token(Lexer* lexer) {
-    size_t current_position = lexer->position;
+    size_t current_position = lexer->current;
     Token token = lexer_next_token(lexer);
-    lexer->position = current_position;
+    lexer->current = current_position;
     return token;
-}
-
-bool lexer_is_at_end(Lexer* lexer) {
-    return lexer->position >= lexer->length;
 } 
