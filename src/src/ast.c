@@ -2,247 +2,178 @@
 #include <stdlib.h>
 #include <string.h>
 
-// AST implementation
-AST* ast_new(void) {
-    AST* ast = (AST*)malloc(sizeof(AST));
-    if (!ast) return NULL;
-    
-    ast->functions = vector_new(sizeof(Function));
-    ast->type_definitions = vector_new(sizeof(TypeDefinition));
-    
-    if (!ast->functions || !ast->type_definitions) {
-        if (ast->functions) vector_free(ast->functions);
-        if (ast->type_definitions) vector_free(ast->type_definitions);
-        free(ast);
-        return NULL;
-    }
-    
-    return ast;
+ASTNode* create_variable_node(const char* name, Type* type) {
+    ASTNode* node = malloc(sizeof(ASTNode));
+    node->type = NODE_VARIABLE;
+    node->data.variable.name = strdup(name);
+    node->data.variable.type = type;
+    return node;
 }
 
-void ast_free(AST* ast) {
-    if (!ast) return;
-    
-    // Free functions
-    for (size_t i = 0; i < ast->functions->size; i++) {
-        Function* func = (Function*)((char*)ast->functions->data + i * sizeof(Function));
-        
-        // Free function name
-        free(func->name);
-        
-        // Free parameters
-        for (size_t j = 0; j < func->parameters->size; j++) {
-            Parameter* param = (Parameter*)((char*)func->parameters->data + j * sizeof(Parameter));
-            free(param->name);
-        }
-        vector_free(func->parameters);
-        
-        // Free block statements
-        for (size_t j = 0; j < func->body.statements->size; j++) {
-            Statement* stmt = (Statement*)((char*)func->body.statements->data + j * sizeof(Statement));
-            statement_free(stmt);
-        }
-        vector_free(func->body.statements);
-    }
-    vector_free(ast->functions);
-    
-    // Free type definitions
-    for (size_t i = 0; i < ast->type_definitions->size; i++) {
-        TypeDefinition* type_def = (TypeDefinition*)((char*)ast->type_definitions->data + i * sizeof(TypeDefinition));
-        
-        // Free type name
-        free(type_def->name);
-        
-        // Free fields
-        for (size_t j = 0; j < type_def->fields->size; j++) {
-            Field* field = (Field*)((char*)type_def->fields->data + j * sizeof(Field));
-            free(field->name);
-        }
-        vector_free(type_def->fields);
-    }
-    vector_free(ast->type_definitions);
-    
-    free(ast);
+ASTNode* create_function_node(const char* name, Type* return_type, Variable** parameters, size_t parameter_count, ASTNode* body) {
+    ASTNode* node = malloc(sizeof(ASTNode));
+    node->type = NODE_FUNCTION;
+    node->data.function.name = strdup(name);
+    node->data.function.return_type = return_type;
+    node->data.function.parameters = parameters;
+    node->data.function.parameter_count = parameter_count;
+    node->data.function.body = body;
+    return node;
 }
 
-void ast_add_function(AST* ast, Function* function) {
-    if (!ast || !function) return;
-    vector_push(ast->functions, function);
+ASTNode* create_let_statement_node(const char* name, Type* type, ASTNode* initializer) {
+    ASTNode* node = malloc(sizeof(ASTNode));
+    node->type = NODE_LET_STATEMENT;
+    node->data.let_statement.name = strdup(name);
+    node->data.let_statement.type = type;
+    node->data.let_statement.initializer = initializer;
+    return node;
 }
 
-void ast_add_type_definition(AST* ast, TypeDefinition* type_def) {
-    if (!ast || !type_def) return;
-    vector_push(ast->type_definitions, type_def);
+ASTNode* create_if_statement_node(ASTNode* condition, ASTNode* then_branch, ASTNode* else_branch) {
+    ASTNode* node = malloc(sizeof(ASTNode));
+    node->type = NODE_IF_STATEMENT;
+    node->data.if_statement.condition = condition;
+    node->data.if_statement.then_branch = then_branch;
+    node->data.if_statement.else_branch = else_branch;
+    return node;
 }
 
-// Statement implementation
-void statement_free(Statement* stmt) {
-    if (!stmt) return;
-    
-    switch (stmt->kind) {
-        case STATEMENT_LET:
-            free(stmt->let_statement.name);
-            if (stmt->let_statement.type_annotation) {
-                type_free(stmt->let_statement.type_annotation);
-            }
-            expression_free(stmt->let_statement.value);
-            break;
-            
-        case STATEMENT_RETURN:
-            expression_free(stmt->return_statement.value);
-            break;
-            
-        case STATEMENT_IF:
-            expression_free(stmt->if_statement.condition);
-            // Free then block
-            for (size_t i = 0; i < stmt->if_statement.then_block.statements->size; i++) {
-                Statement* then_stmt = (Statement*)((char*)stmt->if_statement.then_block.statements->data + i * sizeof(Statement));
-                statement_free(then_stmt);
-            }
-            vector_free(stmt->if_statement.then_block.statements);
-            
-            // Free else block if exists
-            if (stmt->if_statement.else_block) {
-                for (size_t i = 0; i < stmt->if_statement.else_block->statements->size; i++) {
-                    Statement* else_stmt = (Statement*)((char*)stmt->if_statement.else_block->statements->data + i * sizeof(Statement));
-                    statement_free(else_stmt);
-                }
-                vector_free(stmt->if_statement.else_block->statements);
-                free(stmt->if_statement.else_block);
-            }
-            break;
-            
-        case STATEMENT_WHILE:
-            expression_free(stmt->while_statement.condition);
-            // Free body
-            for (size_t i = 0; i < stmt->while_statement.body.statements->size; i++) {
-                Statement* body_stmt = (Statement*)((char*)stmt->while_statement.body.statements->data + i * sizeof(Statement));
-                statement_free(body_stmt);
-            }
-            vector_free(stmt->while_statement.body.statements);
-            break;
-            
-        case STATEMENT_FOR:
-            free(stmt->for_statement.variable);
-            expression_free(stmt->for_statement.iterator);
-            // Free body
-            for (size_t i = 0; i < stmt->for_statement.body.statements->size; i++) {
-                Statement* body_stmt = (Statement*)((char*)stmt->for_statement.body.statements->data + i * sizeof(Statement));
-                statement_free(body_stmt);
-            }
-            vector_free(stmt->for_statement.body.statements);
-            break;
-            
-        case STATEMENT_MATCH:
-            expression_free(stmt->match_statement.expression);
-            // Free arms
-            for (size_t i = 0; i < stmt->match_statement.arms->size; i++) {
-                MatchArm* arm = (MatchArm*)((char*)stmt->match_statement.arms->data + i * sizeof(MatchArm));
-                pattern_free(&arm->pattern);
-                // Free body
-                for (size_t j = 0; j < arm->body.statements->size; j++) {
-                    Statement* body_stmt = (Statement*)((char*)arm->body.statements->data + j * sizeof(Statement));
-                    statement_free(body_stmt);
-                }
-                vector_free(arm->body.statements);
-            }
-            vector_free(stmt->match_statement.arms);
-            break;
-            
-        case STATEMENT_EXPRESSION:
-            expression_free(&stmt->expression_statement);
-            break;
-    }
+ASTNode* create_while_statement_node(ASTNode* condition, ASTNode* body) {
+    ASTNode* node = malloc(sizeof(ASTNode));
+    node->type = NODE_WHILE_STATEMENT;
+    node->data.while_statement.condition = condition;
+    node->data.while_statement.body = body;
+    return node;
 }
 
-// Pattern implementation
-void pattern_free(Pattern* pattern) {
-    if (!pattern) return;
-    
-    switch (pattern->kind) {
-        case PATTERN_IDENTIFIER:
-            free(pattern->identifier);
+ASTNode* create_call_expression_node(ASTNode* callee, ASTNode** arguments, size_t argument_count) {
+    ASTNode* node = malloc(sizeof(ASTNode));
+    node->type = NODE_CALL_EXPRESSION;
+    node->data.call_expression.callee = callee;
+    node->data.call_expression.arguments = arguments;
+    node->data.call_expression.argument_count = argument_count;
+    return node;
+}
+
+ASTNode* create_function_call_node(const char* name, ASTNode** arguments, size_t argument_count) {
+    ASTNode* node = malloc(sizeof(ASTNode));
+    node->type = NODE_FUNCTION_CALL;
+    node->data.function_call.name = strdup(name);
+    node->data.function_call.arguments = arguments;
+    node->data.function_call.argument_count = argument_count;
+    return node;
+}
+
+ASTNode* create_assignment_node(const char* name, ASTNode* value) {
+    ASTNode* node = malloc(sizeof(ASTNode));
+    node->type = NODE_ASSIGNMENT;
+    node->data.assignment.name = strdup(name);
+    node->data.assignment.value = value;
+    return node;
+}
+
+ASTNode* create_variable_reference_node(const char* name) {
+    ASTNode* node = malloc(sizeof(ASTNode));
+    node->type = NODE_VARIABLE_REFERENCE;
+    node->data.variable_reference.name = strdup(name);
+    return node;
+}
+
+ASTNode* create_integer_literal_node(int64_t value) {
+    ASTNode* node = malloc(sizeof(ASTNode));
+    node->type = NODE_INTEGER_LITERAL;
+    node->data.integer_literal.value = value;
+    return node;
+}
+
+ASTNode* create_float_literal_node(double value) {
+    ASTNode* node = malloc(sizeof(ASTNode));
+    node->type = NODE_FLOAT_LITERAL;
+    node->data.float_literal.value = value;
+    return node;
+}
+
+ASTNode* create_string_literal_node(const char* value) {
+    ASTNode* node = malloc(sizeof(ASTNode));
+    node->type = NODE_STRING_LITERAL;
+    node->data.string_literal.value = strdup(value);
+    return node;
+}
+
+ASTNode* create_boolean_literal_node(bool value) {
+    ASTNode* node = malloc(sizeof(ASTNode));
+    node->type = NODE_BOOLEAN_LITERAL;
+    node->data.boolean_literal.value = value;
+    return node;
+}
+
+ASTNode* create_binary_expression_node(ASTNode* left, const char* operator, ASTNode* right) {
+    ASTNode* node = malloc(sizeof(ASTNode));
+    node->type = NODE_BINARY_EXPRESSION;
+    node->data.binary_expression.left = left;
+    node->data.binary_expression.operator = strdup(operator);
+    node->data.binary_expression.right = right;
+    return node;
+}
+
+ASTNode* create_unary_expression_node(const char* operator, ASTNode* right) {
+    ASTNode* node = malloc(sizeof(ASTNode));
+    node->type = NODE_UNARY_EXPRESSION;
+    node->data.unary_expression.operator = strdup(operator);
+    node->data.unary_expression.right = right;
+    return node;
+}
+
+ASTNode* create_expression_statement_node(ASTNode* expression) {
+    ASTNode* node = malloc(sizeof(ASTNode));
+    node->type = NODE_EXPRESSION_STATEMENT;
+    node->data.expression_statement.expression = expression;
+    return node;
+}
+
+ASTNode* create_block_statement_node(ASTNode** statements, size_t statement_count) {
+    ASTNode* node = malloc(sizeof(ASTNode));
+    node->type = NODE_BLOCK_STATEMENT;
+    node->data.block_statement.statements = statements;
+    node->data.block_statement.statement_count = statement_count;
+    return node;
+}
+
+void free_ast_node(ASTNode* node) {
+    if (!node) return;
+    // 各ノード型ごとに必要なら再帰的に解放（ここでは簡易実装）
+    switch (node->type) {
+        case NODE_VARIABLE:
+            free(node->data.variable.name);
             break;
-            
-        case PATTERN_LITERAL:
-            literal_free(&pattern->literal);
+        case NODE_FUNCTION:
+            free(node->data.function.name);
+            // parameters, body なども必要に応じて解放
             break;
-            
-        case PATTERN_TUPLE:
-            for (size_t i = 0; i < pattern->tuple_patterns->size; i++) {
-                Pattern* tuple_pattern = (Pattern*)((char*)pattern->tuple_patterns->data + i * sizeof(Pattern));
-                pattern_free(tuple_pattern);
-            }
-            vector_free(pattern->tuple_patterns);
+        case NODE_LET_STATEMENT:
+            free(node->data.let_statement.name);
             break;
-            
-        case PATTERN_STRUCT:
-            free(pattern->struct_pattern.name);
-            for (size_t i = 0; i < pattern->struct_pattern.fields->size; i++) {
-                FieldPattern* field = (FieldPattern*)((char*)pattern->struct_pattern.fields->data + i * sizeof(FieldPattern));
-                free(field->name);
-                pattern_free(field->pattern);
-            }
-            vector_free(pattern->struct_pattern.fields);
+        case NODE_FUNCTION_CALL:
+            free(node->data.function_call.name);
             break;
-            
+        case NODE_ASSIGNMENT:
+            free(node->data.assignment.name);
+            break;
+        case NODE_VARIABLE_REFERENCE:
+            free(node->data.variable_reference.name);
+            break;
+        case NODE_STRING_LITERAL:
+            free(node->data.string_literal.value);
+            break;
+        case NODE_BINARY_EXPRESSION:
+            free(node->data.binary_expression.operator);
+            break;
+        case NODE_UNARY_EXPRESSION:
+            free(node->data.unary_expression.operator);
+            break;
         default:
             break;
     }
-}
-
-// Expression implementation
-void expression_free(Expression* expr) {
-    if (!expr) return;
-    
-    switch (expr->kind) {
-        case EXPRESSION_LITERAL:
-            literal_free(&expr->literal);
-            break;
-            
-        case EXPRESSION_IDENTIFIER:
-            free(expr->identifier);
-            break;
-            
-        case EXPRESSION_BINARY_OP:
-            expression_free(expr->binary_op->left);
-            expression_free(expr->binary_op->right);
-            free(expr->binary_op);
-            break;
-            
-        case EXPRESSION_UNARY_OP:
-            expression_free(expr->unary_op->right);
-            free(expr->unary_op);
-            break;
-            
-        case EXPRESSION_CALL:
-            free(expr->call->function);
-            for (size_t i = 0; i < expr->call->arguments->size; i++) {
-                Expression* arg = (Expression*)((char*)expr->call->arguments->data + i * sizeof(Expression));
-                expression_free(arg);
-            }
-            vector_free(expr->call->arguments);
-            free(expr->call);
-            break;
-            
-        case EXPRESSION_ASSIGNMENT:
-            free(expr->assignment->target);
-            expression_free(expr->assignment->value);
-            free(expr->assignment);
-            break;
-    }
-}
-
-// Literal implementation
-void literal_free(Literal* literal) {
-    if (!literal) return;
-    
-    switch (literal->kind) {
-        case LITERAL_STRING:
-            free(literal->string);
-            break;
-            
-        default:
-            break;
-    }
+    free(node);
 } 
