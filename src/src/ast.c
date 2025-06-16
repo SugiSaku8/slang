@@ -2,49 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Vector implementation
-struct Vector {
-    void* data;
-    size_t size;
-    size_t capacity;
-    size_t element_size;
-};
-
-Vector* vector_new(size_t element_size) {
-    Vector* vector = (Vector*)malloc(sizeof(Vector));
-    if (!vector) return NULL;
-    
-    vector->data = NULL;
-    vector->size = 0;
-    vector->capacity = 0;
-    vector->element_size = element_size;
-    return vector;
-}
-
-void vector_free(Vector* vector) {
-    if (!vector) return;
-    free(vector->data);
-    free(vector);
-}
-
-void* vector_push(Vector* vector, const void* element) {
-    if (!vector || !element) return NULL;
-    
-    if (vector->size >= vector->capacity) {
-        size_t new_capacity = vector->capacity == 0 ? 1 : vector->capacity * 2;
-        void* new_data = realloc(vector->data, new_capacity * vector->element_size);
-        if (!new_data) return NULL;
-        
-        vector->data = new_data;
-        vector->capacity = new_capacity;
-    }
-    
-    void* dest = (char*)vector->data + vector->size * vector->element_size;
-    memcpy(dest, element, vector->element_size);
-    vector->size++;
-    return dest;
-}
-
 // AST implementation
 AST* ast_new(void) {
     AST* ast = (AST*)malloc(sizeof(AST));

@@ -3,9 +3,17 @@
 
 #include "type_system.h"
 #include <stdbool.h>
+#include <stddef.h>
+
+// Vector definition
+typedef struct Vector {
+    void* data;
+    size_t size;
+    size_t capacity;
+    size_t element_size;
+} Vector;
 
 // Forward declarations
-typedef struct Vector Vector;
 typedef struct AST AST;
 typedef struct Function Function;
 typedef struct Parameter Parameter;

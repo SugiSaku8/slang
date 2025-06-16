@@ -1,4 +1,5 @@
 #include "../include/type_system.h"
+#include "../include/ast.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -7,28 +8,24 @@
 Type* type_new(TypeKind kind) {
     Type* type = (Type*)malloc(sizeof(Type));
     if (!type) return NULL;
-    
     type->kind = kind;
     switch (kind) {
         case TYPE_ARRAY:
             type->array.element_type = NULL;
-            type->array.size = 0;
             break;
         case TYPE_TUPLE:
-            type->tuple.elements = NULL;
-            type->tuple.size = 0;
+            type->tuple.types = NULL;
             break;
         case TYPE_VECTOR:
-            type->vector.dimensions = 0;
+            type->vector.dimension = 0;
             type->vector.element_type = NULL;
             break;
         case TYPE_MATRIX:
             type->matrix.rows = 0;
-            type->matrix.cols = 0;
+            type->matrix.columns = 0;
             type->matrix.element_type = NULL;
             break;
         case TYPE_TENSOR:
-            type->tensor.rank = 0;
             type->tensor.dimensions = NULL;
             type->tensor.element_type = NULL;
             break;
@@ -39,16 +36,15 @@ Type* type_new(TypeKind kind) {
             type->complex.element_type = NULL;
             break;
         case TYPE_FUNCTION:
-            type->function.parameters = NULL;
+            type->function.params = NULL;
             type->function.return_type = NULL;
-            type->function.parameter_count = 0;
+            type->function.priority = NULL;
             break;
         case TYPE_POINTER:
-            type->pointer.pointed_type = NULL;
+            type->pointer.inner_type = NULL;
             break;
         case TYPE_NAMED:
             type->named.name = NULL;
-            type->named.underlying_type = NULL;
             break;
         default:
             break;
@@ -58,16 +54,17 @@ Type* type_new(TypeKind kind) {
 
 void type_free(Type* type) {
     if (!type) return;
-    
     switch (type->kind) {
         case TYPE_ARRAY:
             type_free(type->array.element_type);
             break;
         case TYPE_TUPLE:
-            for (size_t i = 0; i < type->tuple.size; i++) {
-                type_free(type->tuple.elements[i]);
+            if (type->tuple.types) {
+                for (size_t i = 0; i < type->tuple.types->size; i++) {
+                    type_free(((Type**)type->tuple.types->data)[i]);
+                }
+                vector_free(type->tuple.types);
             }
-            free(type->tuple.elements);
             break;
         case TYPE_VECTOR:
             type_free(type->vector.element_type);
@@ -76,8 +73,11 @@ void type_free(Type* type) {
             type_free(type->matrix.element_type);
             break;
         case TYPE_TENSOR:
+            if (type->tensor.dimensions) {
+                free(type->tensor.dimensions->data);
+                vector_free(type->tensor.dimensions);
+            }
             type_free(type->tensor.element_type);
-            free(type->tensor.dimensions);
             break;
         case TYPE_QUATERNION:
             type_free(type->quaternion.element_type);
@@ -86,18 +86,20 @@ void type_free(Type* type) {
             type_free(type->complex.element_type);
             break;
         case TYPE_FUNCTION:
-            for (size_t i = 0; i < type->function.parameter_count; i++) {
-                type_free(type->function.parameters[i]);
+            if (type->function.params) {
+                for (size_t i = 0; i < type->function.params->size; i++) {
+                    type_free(((Type**)type->function.params->data)[i]);
+                }
+                vector_free(type->function.params);
             }
-            free(type->function.parameters);
             type_free(type->function.return_type);
+            if (type->function.priority) free(type->function.priority);
             break;
         case TYPE_POINTER:
-            type_free(type->pointer.pointed_type);
+            type_free(type->pointer.inner_type);
             break;
         case TYPE_NAMED:
             free(type->named.name);
-            type_free(type->named.underlying_type);
             break;
         default:
             break;
@@ -139,62 +141,50 @@ bool type_is_named(const Type* type) {
 }
 
 // Type information getters
-size_t type_get_vector_dimensions(const Type* type) {
-    return type_is_vector(type) ? type->vector.dimensions : 0;
+size_t type_get_vector_dimension(const Type* type) {
+    return type_is_vector(type) ? type->vector.dimension : 0;
 }
 
-size_t type_get_matrix_rows(const Type* type) {
-    return type_is_matrix(type) ? type->matrix.rows : 0;
+bool type_get_matrix_dimensions(const Type* type, size_t* rows, size_t* cols) {
+    if (type_is_matrix(type)) {
+        *rows = type->matrix.rows;
+        *cols = type->matrix.columns;
+        return true;
+    }
+    return false;
 }
 
-size_t type_get_matrix_cols(const Type* type) {
-    return type_is_matrix(type) ? type->matrix.cols : 0;
-}
-
-size_t type_get_tensor_rank(const Type* type) {
-    return type_is_tensor(type) ? type->tensor.rank : 0;
-}
-
-const size_t* type_get_tensor_dimensions(const Type* type) {
+Vector* type_get_tensor_dimensions(const Type* type) {
     return type_is_tensor(type) ? type->tensor.dimensions : NULL;
 }
 
-const Type* type_get_element_type(const Type* type) {
-    if (!type) return NULL;
-    
-    switch (type->kind) {
-        case TYPE_ARRAY:
-            return type->array.element_type;
-        case TYPE_VECTOR:
-            return type->vector.element_type;
-        case TYPE_MATRIX:
-            return type->matrix.element_type;
-        case TYPE_TENSOR:
-            return type->tensor.element_type;
-        case TYPE_QUATERNION:
-            return type->quaternion.element_type;
-        case TYPE_COMPLEX:
-            return type->complex.element_type;
-        case TYPE_POINTER:
-            return type->pointer.pointed_type;
-        default:
-            return NULL;
+bool type_get_function_signature(const Type* type, Vector** params, Type** return_type) {
+    if (type_is_function(type)) {
+        *params = type->function.params;
+        *return_type = type->function.return_type;
+        return true;
     }
+    return false;
 }
 
-const Type* type_get_function_return_type(const Type* type) {
-    return type_is_function(type) ? type->function.return_type : NULL;
+Type* type_get_pointer_type(const Type* type) {
+    return type_is_pointer(type) ? type->pointer.inner_type : NULL;
 }
 
-size_t type_get_function_parameter_count(const Type* type) {
-    return type_is_function(type) ? type->function.parameter_count : 0;
+uint32_t* type_get_priority(const Type* type) {
+    return type_is_function(type) ? type->function.priority : NULL;
 }
 
-const Type* type_get_function_parameter_type(const Type* type, size_t index) {
-    if (!type_is_function(type) || index >= type->function.parameter_count) {
-        return NULL;
+bool type_set_priority(Type* type, uint32_t priority) {
+    if (type_is_function(type)) {
+        if (!type->function.priority) {
+            type->function.priority = (uint32_t*)malloc(sizeof(uint32_t));
+            if (!type->function.priority) return false;
+        }
+        *type->function.priority = priority;
+        return true;
     }
-    return type->function.parameters[index];
+    return false;
 }
 
 // Type compatibility
@@ -208,35 +198,33 @@ bool type_is_compatible_with(const Type* type1, const Type* type2) {
         case TYPE_FLOAT:
         case TYPE_BOOL:
         case TYPE_STRING:
-        case TYPE_NULL:
             return true;
             
         case TYPE_ARRAY:
-            return type_is_compatible_with(type1->array.element_type, type2->array.element_type) &&
-                   type1->array.size == type2->array.size;
+            return type_is_compatible_with(type1->array.element_type, type2->array.element_type);
             
         case TYPE_TUPLE:
-            if (type1->tuple.size != type2->tuple.size) return false;
-            for (size_t i = 0; i < type1->tuple.size; i++) {
-                if (!type_is_compatible_with(type1->tuple.elements[i], type2->tuple.elements[i])) {
+            if (type1->tuple.types->size != type2->tuple.types->size) return false;
+            for (size_t i = 0; i < type1->tuple.types->size; i++) {
+                if (!type_is_compatible_with(((Type**)type1->tuple.types->data)[i], ((Type**)type2->tuple.types->data)[i])) {
                     return false;
                 }
             }
             return true;
             
         case TYPE_VECTOR:
-            return type1->vector.dimensions == type2->vector.dimensions &&
+            return type1->vector.dimension == type2->vector.dimension &&
                    type_is_compatible_with(type1->vector.element_type, type2->vector.element_type);
             
         case TYPE_MATRIX:
             return type1->matrix.rows == type2->matrix.rows &&
-                   type1->matrix.cols == type2->matrix.cols &&
+                   type1->matrix.columns == type2->matrix.columns &&
                    type_is_compatible_with(type1->matrix.element_type, type2->matrix.element_type);
             
         case TYPE_TENSOR:
-            if (type1->tensor.rank != type2->tensor.rank) return false;
-            for (size_t i = 0; i < type1->tensor.rank; i++) {
-                if (type1->tensor.dimensions[i] != type2->tensor.dimensions[i]) {
+            if (type1->tensor.dimensions->size != type2->tensor.dimensions->size) return false;
+            for (size_t i = 0; i < type1->tensor.dimensions->size; i++) {
+                if (((size_t*)type1->tensor.dimensions->data)[i] != ((size_t*)type2->tensor.dimensions->data)[i]) {
                     return false;
                 }
             }
@@ -249,23 +237,22 @@ bool type_is_compatible_with(const Type* type1, const Type* type2) {
             return type_is_compatible_with(type1->complex.element_type, type2->complex.element_type);
             
         case TYPE_FUNCTION:
-            if (type1->function.parameter_count != type2->function.parameter_count) return false;
+            if (type1->function.params->size != type2->function.params->size) return false;
             if (!type_is_compatible_with(type1->function.return_type, type2->function.return_type)) {
                 return false;
             }
-            for (size_t i = 0; i < type1->function.parameter_count; i++) {
-                if (!type_is_compatible_with(type1->function.parameters[i], type2->function.parameters[i])) {
+            for (size_t i = 0; i < type1->function.params->size; i++) {
+                if (!type_is_compatible_with(((Type**)type1->function.params->data)[i], ((Type**)type2->function.params->data)[i])) {
                     return false;
                 }
             }
             return true;
             
         case TYPE_POINTER:
-            return type_is_compatible_with(type1->pointer.pointed_type, type2->pointer.pointed_type);
+            return type_is_compatible_with(type1->pointer.inner_type, type2->pointer.inner_type);
             
         case TYPE_NAMED:
-            return strcmp(type1->named.name, type2->named.name) == 0 &&
-                   type_is_compatible_with(type1->named.underlying_type, type2->named.underlying_type);
+            return strcmp(type1->named.name, type2->named.name) == 0;
             
         default:
             return false;
@@ -279,13 +266,13 @@ bool type_can_own(const Type* type1, const Type* type2) {
         return false;
     }
     
-    if (type1->function.parameter_count != type2->function.parameter_count) {
+    if (type1->function.params->size != type2->function.params->size) {
         return false;
     }
     
-    for (size_t i = 0; i < type1->function.parameter_count; i++) {
-        const Type* param1 = type1->function.parameters[i];
-        const Type* param2 = type2->function.parameters[i];
+    for (size_t i = 0; i < type1->function.params->size; i++) {
+        const Type* param1 = ((Type**)type1->function.params->data)[i];
+        const Type* param2 = ((Type**)type2->function.params->data)[i];
         
         if (!type_is_compatible_with(param1, param2)) {
             return false;
@@ -317,23 +304,19 @@ char* type_to_string(const Type* type) {
             result = strdup("string");
             break;
             
-        case TYPE_NULL:
-            result = strdup("null");
-            break;
-            
         case TYPE_ARRAY: {
             char* element_str = type_to_string(type->array.element_type);
-            asprintf(&result, "[%s; %zu]", element_str, type->array.size);
+            asprintf(&result, "[%s]", element_str);
             free(element_str);
             break;
         }
             
         case TYPE_TUPLE: {
-            char* elements[type->tuple.size];
+            char* elements[type->tuple.types->size];
             size_t total_len = 2; // For "()"
             
-            for (size_t i = 0; i < type->tuple.size; i++) {
-                elements[i] = type_to_string(type->tuple.elements[i]);
+            for (size_t i = 0; i < type->tuple.types->size; i++) {
+                elements[i] = type_to_string(((Type**)type->tuple.types->data)[i]);
                 total_len += strlen(elements[i]) + 2; // +2 for ", "
             }
             
@@ -341,10 +324,10 @@ char* type_to_string(const Type* type) {
             char* ptr = result;
             *ptr++ = '(';
             
-            for (size_t i = 0; i < type->tuple.size; i++) {
+            for (size_t i = 0; i < type->tuple.types->size; i++) {
                 strcpy(ptr, elements[i]);
                 ptr += strlen(elements[i]);
-                if (i < type->tuple.size - 1) {
+                if (i < type->tuple.types->size - 1) {
                     *ptr++ = ',';
                     *ptr++ = ' ';
                 }
@@ -357,25 +340,25 @@ char* type_to_string(const Type* type) {
             
         case TYPE_VECTOR: {
             char* element_str = type_to_string(type->vector.element_type);
-            asprintf(&result, "vec%zu<%s>", type->vector.dimensions, element_str);
+            asprintf(&result, "vec%zu<%s>", type->vector.dimension, element_str);
             free(element_str);
             break;
         }
             
         case TYPE_MATRIX: {
             char* element_str = type_to_string(type->matrix.element_type);
-            asprintf(&result, "mat%zux%zu<%s>", type->matrix.rows, type->matrix.cols, element_str);
+            asprintf(&result, "mat%zux%zu<%s>", type->matrix.rows, type->matrix.columns, element_str);
             free(element_str);
             break;
         }
             
         case TYPE_TENSOR: {
             char* element_str = type_to_string(type->tensor.element_type);
-            char* dims = malloc(type->tensor.rank * 4 + 1); // Each dimension can be up to 3 digits + 'x'
+            char* dims = malloc(type->tensor.dimensions->size * 4 + 1); // Each dimension can be up to 3 digits + 'x'
             char* ptr = dims;
             
-            for (size_t i = 0; i < type->tensor.rank; i++) {
-                ptr += sprintf(ptr, "%zux", type->tensor.dimensions[i]);
+            for (size_t i = 0; i < type->tensor.dimensions->size; i++) {
+                ptr += sprintf(ptr, "%zux", ((size_t*)type->tensor.dimensions->data)[i]);
             }
             *(ptr - 1) = '\0'; // Remove last 'x'
             
@@ -400,11 +383,11 @@ char* type_to_string(const Type* type) {
         }
             
         case TYPE_FUNCTION: {
-            char* params[type->function.parameter_count];
+            char* params[type->function.params->size];
             size_t total_len = 2; // For "()"
             
-            for (size_t i = 0; i < type->function.parameter_count; i++) {
-                params[i] = type_to_string(type->function.parameters[i]);
+            for (size_t i = 0; i < type->function.params->size; i++) {
+                params[i] = type_to_string(((Type**)type->function.params->data)[i]);
                 total_len += strlen(params[i]) + 2; // +2 for ", "
             }
             
@@ -415,10 +398,10 @@ char* type_to_string(const Type* type) {
             char* ptr = result;
             *ptr++ = '(';
             
-            for (size_t i = 0; i < type->function.parameter_count; i++) {
+            for (size_t i = 0; i < type->function.params->size; i++) {
                 strcpy(ptr, params[i]);
                 ptr += strlen(params[i]);
-                if (i < type->function.parameter_count - 1) {
+                if (i < type->function.params->size - 1) {
                     *ptr++ = ',';
                     *ptr++ = ' ';
                 }
@@ -433,7 +416,7 @@ char* type_to_string(const Type* type) {
         }
             
         case TYPE_POINTER: {
-            char* pointed_str = type_to_string(type->pointer.pointed_type);
+            char* pointed_str = type_to_string(type->pointer.inner_type);
             asprintf(&result, "*%s", pointed_str);
             free(pointed_str);
             break;

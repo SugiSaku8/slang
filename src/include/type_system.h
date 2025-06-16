@@ -83,7 +83,7 @@ bool type_is_complex(const Type* type);
 bool type_is_function(const Type* type);
 bool type_is_pointer(const Type* type);
 bool type_is_numeric(const Type* type);
-size_t* type_get_vector_dimension(const Type* type);
+size_t type_get_vector_dimension(const Type* type);
 bool type_get_matrix_dimensions(const Type* type, size_t* rows, size_t* cols);
 Vector* type_get_tensor_dimensions(const Type* type);
 bool type_get_function_signature(const Type* type, Vector** params, Type** return_type);
