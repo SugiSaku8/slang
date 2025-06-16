@@ -29,67 +29,15 @@ typedef struct UnaryOpExpression UnaryOpExpression;
 typedef struct CallExpression CallExpression;
 typedef struct AssignmentExpression AssignmentExpression;
 
-// AST structure
-struct AST {
-    Vector* functions;
-    Vector* type_definitions;
-};
-
-// Function structure
-struct Function {
-    char* name;
-    Vector* parameters;
-    Type return_type;
-    int32_t priority;
-    Block body;
-};
-
-// Parameter structure
-struct Parameter {
-    char* name;
-    Type type_annotation;
-};
-
-// TypeDefinition structure
-struct TypeDefinition {
-    char* name;
-    Vector* fields;
-};
-
-// Field structure
-struct Field {
-    char* name;
-    Type type_annotation;
-};
+// Function declarations
+void statement_free(Statement* stmt);
+void pattern_free(Pattern* pattern);
+void expression_free(Expression* expr);
+void literal_free(Literal* literal);
 
 // Block structure
 struct Block {
     Vector* statements;
-};
-
-// Statement types
-typedef enum {
-    STATEMENT_LET,
-    STATEMENT_RETURN,
-    STATEMENT_IF,
-    STATEMENT_WHILE,
-    STATEMENT_FOR,
-    STATEMENT_MATCH,
-    STATEMENT_EXPRESSION
-} StatementType;
-
-// Statement structure
-struct Statement {
-    StatementType kind;
-    union {
-        LetStatement let_statement;
-        ReturnStatement return_statement;
-        IfStatement if_statement;
-        WhileStatement while_statement;
-        ForStatement for_statement;
-        MatchStatement match_statement;
-        Expression expression_statement;
-    };
 };
 
 // LetStatement structure
@@ -254,6 +202,64 @@ struct CallExpression {
 struct AssignmentExpression {
     char* target;
     Expression* value;
+};
+
+// Statement types
+typedef enum {
+    STATEMENT_LET,
+    STATEMENT_RETURN,
+    STATEMENT_IF,
+    STATEMENT_WHILE,
+    STATEMENT_FOR,
+    STATEMENT_MATCH,
+    STATEMENT_EXPRESSION
+} StatementType;
+
+// Statement structure
+struct Statement {
+    StatementType kind;
+    union {
+        LetStatement let_statement;
+        ReturnStatement return_statement;
+        IfStatement if_statement;
+        WhileStatement while_statement;
+        ForStatement for_statement;
+        MatchStatement match_statement;
+        Expression expression_statement;
+    };
+};
+
+// Function structure
+struct Function {
+    char* name;
+    Vector* parameters;
+    Type return_type;
+    int32_t priority;
+    Block body;
+};
+
+// Parameter structure
+struct Parameter {
+    char* name;
+    Type type_annotation;
+};
+
+// TypeDefinition structure
+struct TypeDefinition {
+    char* name;
+    Vector* fields;
+};
+
+// Field structure
+struct Field {
+    char* name;
+    Type type_annotation;
+};
+
+// AST structure
+struct AST {
+    Vector* functions;
+    Vector* type_definitions;
 };
 
 // AST functions

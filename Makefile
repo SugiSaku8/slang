@@ -11,22 +11,21 @@ OBJS = $(SRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 # Main target
 TARGET = $(BIN_DIR)/slang
 
-# Create necessary directories
-$(shell mkdir -p $(OBJ_DIR) $(BIN_DIR))
+.PHONY: all clean
 
 # Default target
 all: $(TARGET)
 
 # Link
 $(TARGET): $(OBJS)
+	@mkdir -p $(BIN_DIR)
 	$(CC) $(OBJS) -o $@
 
 # Compile
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
+	@mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Clean
 clean:
-	rm -rf $(OBJ_DIR) $(BIN_DIR)
-
-.PHONY: all clean 
+	rm -rf $(OBJ_DIR) $(BIN_DIR) 
