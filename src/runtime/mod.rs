@@ -122,7 +122,7 @@ impl Runtime {
             crate::ir::IRValue::Null => Ok(Box::new(())),
             crate::ir::IRValue::Variable(name) => {
                 self.memory_manager.get_value(name)
-                    .map(|v| v.clone())
+                    .map(|v| Box::new(v.as_ref().clone()))
                     .ok_or_else(|| SlangError::Runtime(format!("Variable not found: {}", name)))
             }
             crate::ir::IRValue::BinaryOp { left, op, right } => {
@@ -138,7 +138,7 @@ impl Runtime {
                 let arg_values = arguments.iter()
                     .map(|arg| self.evaluate_value(arg))
                     .collect::<Result<Vec<_>>>()?;
-                self.execute_function_call(function, &arg_values)
+                self.execute_function(function, &arg_values)
             }
             crate::ir::IRValue::Assignment { name, value } => {
                 let value = self.evaluate_value(value)?;
@@ -374,6 +374,29 @@ impl Runtime {
                 }
             }
             _ => todo!(),
+        }
+    }
+
+    fn execute_function(&mut self, function: &str, arguments: &[Box<dyn Any>]) -> Result<Box<dyn Any>> {
+        if let Some(func) = self.standard_library.get_function(function) {
+            if func.parameters.len() != arguments.len() {
+                return Err(SlangError::Runtime(format!(
+                    "Function {} expects {} arguments, got {}",
+                    function, func.parameters.len(), arguments.len()
+                )));
+            }
+
+            // Create a new scope for the function call
+            let mut scope = HashMap::new();
+            for (param, arg) in func.parameters.iter().zip(arguments.iter()) {
+                scope.insert(param.name.clone(), arg.clone());
+            }
+
+            // Execute the function body
+            let result = self.execute_block(&func.body, &mut scope)?;
+            Ok(result)
+        } else {
+            Err(SlangError::Runtime(format!("Function not found: {}", function)))
         }
     }
 }

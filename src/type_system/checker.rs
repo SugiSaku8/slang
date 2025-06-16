@@ -316,9 +316,9 @@ impl TypeChecker {
                     for field in fields {
                         if let Some(field_type) = field_types.iter()
                             .find(|f| f.name == field.name)
-                            .map(|f| f.type_.clone())
+                            .map(|f| &f.type_annotation)
                         {
-                            self.check_pattern(&field.pattern, &field_type)?;
+                            self.check_pattern(&field.pattern, field_type)?;
                         } else {
                             return Err(SlangError::Type(format!(
                                 "Unknown field: {} in type {}",

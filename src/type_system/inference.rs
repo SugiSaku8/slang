@@ -248,20 +248,10 @@ impl TypeInference {
                 self.type_vars.insert(name.clone(), value_type.clone());
                 Ok(())
             }
-            Pattern::Struct { name, fields } => {
-                if let Type::Named(type_name) = value_type {
-                    let field_types = self.get_field_types(type_name)?;
-                    for field in fields {
-                        if let Some(field_type) = field_types.get(&field.name) {
-                            self.infer_pattern(&field.pattern, field_type)?;
-                        } else {
-                            return Err(SlangError::Type(format!("Field '{}' not found in struct '{}'", field.name, name)));
-                        }
-                    }
-                    Ok(())
-                } else {
-                    Err(SlangError::Type(format!("Expected struct type, got {}", value_type)))
-                }
+            Pattern::Literal(lit) => {
+                let literal_type = self.infer_literal(lit);
+                self.add_constraint(value_type.clone(), literal_type)?;
+                Ok(())
             }
             Pattern::Wildcard => Ok(()),
             Pattern::Tuple(patterns) => {
@@ -275,6 +265,21 @@ impl TypeInference {
                     Ok(())
                 } else {
                     Err(SlangError::Type(format!("Expected tuple type, got {}", value_type)))
+                }
+            }
+            Pattern::Struct { name, fields } => {
+                if let Type::Named(type_name) = value_type {
+                    let field_types = self.get_field_types(type_name)?;
+                    for field in fields {
+                        if let Some(field_type) = field_types.get(&field.name) {
+                            self.infer_pattern(&field.pattern, field_type)?;
+                        } else {
+                            return Err(SlangError::Type(format!("Field '{}' not found in struct '{}'", field.name, name)));
+                        }
+                    }
+                    Ok(())
+                } else {
+                    Err(SlangError::Type(format!("Expected struct type, got {}", value_type)))
                 }
             }
         }
