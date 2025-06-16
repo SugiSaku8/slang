@@ -1,73 +1,58 @@
 #ifndef LEXER_H
 #define LEXER_H
 
-#include <stdbool.h>
-#include <stdint.h>
+#include <stddef.h>
 
 typedef enum {
-    TOKEN_EOF,
-    TOKEN_IDENTIFIER,
-    TOKEN_INTEGER,
-    TOKEN_FLOAT,
-    TOKEN_STRING,
-    TOKEN_TRUE,
-    TOKEN_FALSE,
-    TOKEN_LET,
-    TOKEN_FN,
-    TOKEN_IF,
-    TOKEN_ELSE,
-    TOKEN_WHILE,
-    TOKEN_RETURN,
-    TOKEN_PLUS,
-    TOKEN_MINUS,
-    TOKEN_STAR,
-    TOKEN_SLASH,
-    TOKEN_EQUALS,
-    TOKEN_NOT_EQUALS,
-    TOKEN_LESS,
-    TOKEN_LESS_EQUALS,
-    TOKEN_GREATER,
-    TOKEN_GREATER_EQUALS,
-    TOKEN_ASSIGN,
-    TOKEN_SEMICOLON,
-    TOKEN_COMMA,
-    TOKEN_LEFT_PAREN,
-    TOKEN_RIGHT_PAREN,
-    TOKEN_LEFT_BRACE,
-    TOKEN_RIGHT_BRACE,
-    TOKEN_LEFT_BRACKET,
-    TOKEN_RIGHT_BRACKET,
-    TOKEN_DOT,
-    TOKEN_ARROW,
-    TOKEN_ERROR
+    // Single-character tokens
+    TOKEN_LEFT_PAREN, TOKEN_RIGHT_PAREN,
+    TOKEN_LEFT_BRACE, TOKEN_RIGHT_BRACE,
+    TOKEN_LEFT_BRACKET, TOKEN_RIGHT_BRACKET,
+    TOKEN_COMMA, TOKEN_DOT, TOKEN_MINUS, TOKEN_PLUS,
+    TOKEN_SEMICOLON, TOKEN_SLASH, TOKEN_STAR,
+
+    // One or two character tokens
+    TOKEN_BANG, TOKEN_BANG_EQUAL,
+    TOKEN_EQUAL, TOKEN_EQUAL_EQUAL,
+    TOKEN_GREATER, TOKEN_GREATER_EQUAL,
+    TOKEN_LESS, TOKEN_LESS_EQUAL,
+
+    // Literals
+    TOKEN_IDENTIFIER, TOKEN_STRING, TOKEN_NUMBER,
+
+    // Keywords
+    TOKEN_AND, TOKEN_CLASS, TOKEN_ELSE, TOKEN_FALSE,
+    TOKEN_FOR, TOKEN_FUNCTION, TOKEN_IF, TOKEN_IN,
+    TOKEN_MATCH, TOKEN_NULL, TOKEN_OR,
+    TOKEN_PRINT, TOKEN_RETURN, TOKEN_SUPER, TOKEN_THIS,
+    TOKEN_TRUE, TOKEN_TYPE, TOKEN_PRIORITY, TOKEN_MOST_HIGH,
+    TOKEN_VAR, TOKEN_WHILE,
+
+    TOKEN_ERROR,
+    TOKEN_EOF
 } TokenType;
 
 typedef struct {
     TokenType type;
-    const char* lexeme;
-    int64_t line;
-    int64_t column;
+    const char* start;
+    size_t length;
+    int line;
     union {
-        int64_t integer_value;
-        double float_value;
-        char* string_value;
-        char* error_message;
-    } literal;
+        double number;
+        char* string;
+    } value;
 } Token;
 
 typedef struct {
     const char* source;
     size_t start;
     size_t current;
-    int64_t line;
-    int64_t column;
+    int line;
 } Lexer;
 
 // Function declarations
-Lexer* create_lexer(const char* source);
-void free_lexer(Lexer* lexer);
-Token next_token(Lexer* lexer);
-Token peek_token(Lexer* lexer);
-bool is_at_end(Lexer* lexer);
+Lexer* lexer_init(const char* source);
+void lexer_free(Lexer* lexer);
+Token lexer_next_token(Lexer* lexer);
 
 #endif // LEXER_H 
