@@ -1,284 +1,157 @@
-#ifndef SLANG_AST_H
-#define SLANG_AST_H
+#ifndef AST_H
+#define AST_H
 
 #include "type_system.h"
 #include <stdbool.h>
-#include <stddef.h>
+#include <stdint.h>
 
-// Vector definition
-typedef struct Vector {
-    void* data;
-    size_t size;
-    size_t capacity;
-    size_t element_size;
-} Vector;
+typedef struct {
+    char* name;
+    Type* type;
+} Variable;
 
-// Forward declarations
-typedef struct AST AST;
-typedef struct Function Function;
-typedef struct Parameter Parameter;
-typedef struct TypeDefinition TypeDefinition;
-typedef struct Field Field;
-typedef struct Block Block;
-typedef struct Statement Statement;
-typedef struct LetStatement LetStatement;
-typedef struct ReturnStatement ReturnStatement;
-typedef struct IfStatement IfStatement;
-typedef struct WhileStatement WhileStatement;
-typedef struct ForStatement ForStatement;
-typedef struct MatchStatement MatchStatement;
-typedef struct MatchArm MatchArm;
-typedef struct Pattern Pattern;
-typedef struct FieldPattern FieldPattern;
-typedef struct Expression Expression;
-typedef struct Literal Literal;
-typedef struct BinaryOpExpression BinaryOpExpression;
-typedef struct UnaryOpExpression UnaryOpExpression;
-typedef struct CallExpression CallExpression;
-typedef struct AssignmentExpression AssignmentExpression;
+typedef struct {
+    char* name;
+    Type* return_type;
+    Variable** parameters;
+    size_t parameter_count;
+    struct ASTNode* body;
+} Function;
+
+typedef struct {
+    char* name;
+    Type* type;
+    struct ASTNode* initializer;
+} LetStatement;
+
+typedef struct {
+    struct ASTNode* condition;
+    struct ASTNode* then_branch;
+    struct ASTNode* else_branch;
+} IfStatement;
+
+typedef struct {
+    struct ASTNode* condition;
+    struct ASTNode* body;
+} WhileStatement;
+
+typedef struct {
+    struct ASTNode* callee;
+    struct ASTNode** arguments;
+    size_t argument_count;
+} CallExpression;
+
+typedef struct {
+    char* name;
+    struct ASTNode** arguments;
+    size_t argument_count;
+} FunctionCall;
+
+typedef struct {
+    char* name;
+    struct ASTNode* value;
+} Assignment;
+
+typedef struct {
+    char* name;
+} VariableReference;
+
+typedef struct {
+    int64_t value;
+} IntegerLiteral;
+
+typedef struct {
+    double value;
+} FloatLiteral;
+
+typedef struct {
+    char* value;
+} StringLiteral;
+
+typedef struct {
+    bool value;
+} BooleanLiteral;
+
+typedef struct {
+    struct ASTNode* left;
+    char* operator;
+    struct ASTNode* right;
+} BinaryExpression;
+
+typedef struct {
+    char* operator;
+    struct ASTNode* right;
+} UnaryExpression;
+
+typedef struct {
+    struct ASTNode* expression;
+} ExpressionStatement;
+
+typedef struct {
+    struct ASTNode** statements;
+    size_t statement_count;
+} BlockStatement;
+
+typedef struct ASTNode {
+    enum {
+        NODE_VARIABLE,
+        NODE_FUNCTION,
+        NODE_LET_STATEMENT,
+        NODE_IF_STATEMENT,
+        NODE_WHILE_STATEMENT,
+        NODE_CALL_EXPRESSION,
+        NODE_FUNCTION_CALL,
+        NODE_ASSIGNMENT,
+        NODE_VARIABLE_REFERENCE,
+        NODE_INTEGER_LITERAL,
+        NODE_FLOAT_LITERAL,
+        NODE_STRING_LITERAL,
+        NODE_BOOLEAN_LITERAL,
+        NODE_BINARY_EXPRESSION,
+        NODE_UNARY_EXPRESSION,
+        NODE_EXPRESSION_STATEMENT,
+        NODE_BLOCK_STATEMENT
+    } type;
+    union {
+        Variable variable;
+        Function function;
+        LetStatement let_statement;
+        IfStatement if_statement;
+        WhileStatement while_statement;
+        CallExpression call_expression;
+        FunctionCall function_call;
+        Assignment assignment;
+        VariableReference variable_reference;
+        IntegerLiteral integer_literal;
+        FloatLiteral float_literal;
+        StringLiteral string_literal;
+        BooleanLiteral boolean_literal;
+        BinaryExpression binary_expression;
+        UnaryExpression unary_expression;
+        ExpressionStatement expression_statement;
+        BlockStatement block_statement;
+    } data;
+} ASTNode;
 
 // Function declarations
-void statement_free(Statement* stmt);
-void pattern_free(Pattern* pattern);
-void expression_free(Expression* expr);
-void literal_free(Literal* literal);
+ASTNode* create_variable_node(const char* name, Type* type);
+ASTNode* create_function_node(const char* name, Type* return_type, Variable** parameters, size_t parameter_count, ASTNode* body);
+ASTNode* create_let_statement_node(const char* name, Type* type, ASTNode* initializer);
+ASTNode* create_if_statement_node(ASTNode* condition, ASTNode* then_branch, ASTNode* else_branch);
+ASTNode* create_while_statement_node(ASTNode* condition, ASTNode* body);
+ASTNode* create_call_expression_node(ASTNode* callee, ASTNode** arguments, size_t argument_count);
+ASTNode* create_function_call_node(const char* name, ASTNode** arguments, size_t argument_count);
+ASTNode* create_assignment_node(const char* name, ASTNode* value);
+ASTNode* create_variable_reference_node(const char* name);
+ASTNode* create_integer_literal_node(int64_t value);
+ASTNode* create_float_literal_node(double value);
+ASTNode* create_string_literal_node(const char* value);
+ASTNode* create_boolean_literal_node(bool value);
+ASTNode* create_binary_expression_node(ASTNode* left, const char* operator, ASTNode* right);
+ASTNode* create_unary_expression_node(const char* operator, ASTNode* right);
+ASTNode* create_expression_statement_node(ASTNode* expression);
+ASTNode* create_block_statement_node(ASTNode** statements, size_t statement_count);
 
-// Vector API
-Vector* vector_new(size_t element_size);
-void vector_free(Vector* vector);
-void* vector_push(Vector* vector, const void* element);
+void free_ast_node(ASTNode* node);
 
-// Literal types
-typedef enum {
-    LITERAL_INT,
-    LITERAL_FLOAT,
-    LITERAL_BOOL,
-    LITERAL_STRING,
-    LITERAL_NULL
-} LiteralType;
-
-// Literal structure
-struct Literal {
-    LiteralType kind;
-    union {
-        int64_t integer;
-        double floating;
-        bool boolean;
-        char* string;
-    };
-};
-
-// BinaryOperator types
-typedef enum {
-    BINARY_OP_ADD,
-    BINARY_OP_SUB,
-    BINARY_OP_MUL,
-    BINARY_OP_DIV,
-    BINARY_OP_MOD,
-    BINARY_OP_EQ,
-    BINARY_OP_NEQ,
-    BINARY_OP_LT,
-    BINARY_OP_LTE,
-    BINARY_OP_GT,
-    BINARY_OP_GTE,
-    BINARY_OP_AND,
-    BINARY_OP_OR
-} BinaryOperator;
-
-// UnaryOperator types
-typedef enum {
-    UNARY_OP_NEG,
-    UNARY_OP_NOT
-} UnaryOperator;
-
-// Pattern types
-typedef enum {
-    PATTERN_IDENTIFIER,
-    PATTERN_LITERAL,
-    PATTERN_WILDCARD,
-    PATTERN_TUPLE,
-    PATTERN_STRUCT
-} PatternType;
-
-// Pattern structure
-struct Pattern {
-    PatternType kind;
-    union {
-        char* identifier;
-        struct Literal literal;
-        Vector* tuple_patterns;
-        struct {
-            char* name;
-            Vector* fields;
-        } struct_pattern;
-    };
-};
-
-// FieldPattern structure
-struct FieldPattern {
-    char* name;
-    struct Pattern* pattern;
-};
-
-// Expression types
-typedef enum {
-    EXPRESSION_LITERAL,
-    EXPRESSION_IDENTIFIER,
-    EXPRESSION_BINARY_OP,
-    EXPRESSION_UNARY_OP,
-    EXPRESSION_CALL,
-    EXPRESSION_ASSIGNMENT
-} ExpressionType;
-
-// BinaryOpExpression structure
-struct BinaryOpExpression {
-    struct Expression* left;
-    BinaryOperator op;
-    struct Expression* right;
-};
-
-// UnaryOpExpression structure
-struct UnaryOpExpression {
-    UnaryOperator op;
-    struct Expression* right;
-};
-
-// CallExpression structure
-struct CallExpression {
-    char* function;
-    Vector* arguments;
-};
-
-// AssignmentExpression structure
-struct AssignmentExpression {
-    char* target;
-    struct Expression* value;
-};
-
-// Expression structure
-struct Expression {
-    ExpressionType kind;
-    union {
-        struct Literal literal;
-        char* identifier;
-        struct BinaryOpExpression* binary_op;
-        struct UnaryOpExpression* unary_op;
-        struct CallExpression* call;
-        struct AssignmentExpression* assignment;
-    };
-};
-
-// Block structure
-struct Block {
-    Vector* statements;
-};
-
-// LetStatement structure
-struct LetStatement {
-    char* name;
-    Type* type_annotation;
-    struct Expression* value;
-};
-
-// ReturnStatement structure
-struct ReturnStatement {
-    struct Expression* value;
-};
-
-// IfStatement structure
-struct IfStatement {
-    struct Expression* condition;
-    struct Block then_block;
-    struct Block* else_block;
-};
-
-// WhileStatement structure
-struct WhileStatement {
-    struct Expression* condition;
-    struct Block body;
-};
-
-// ForStatement structure
-struct ForStatement {
-    char* variable;
-    struct Expression* iterator;
-    struct Block body;
-};
-
-// MatchStatement structure
-struct MatchStatement {
-    struct Expression* expression;
-    Vector* arms;
-};
-
-// MatchArm structure
-struct MatchArm {
-    struct Pattern pattern;
-    struct Block body;
-};
-
-// Statement types
-typedef enum {
-    STATEMENT_LET,
-    STATEMENT_RETURN,
-    STATEMENT_IF,
-    STATEMENT_WHILE,
-    STATEMENT_FOR,
-    STATEMENT_MATCH,
-    STATEMENT_EXPRESSION
-} StatementType;
-
-// Statement structure
-struct Statement {
-    StatementType kind;
-    union {
-        struct LetStatement let_statement;
-        struct ReturnStatement return_statement;
-        struct IfStatement if_statement;
-        struct WhileStatement while_statement;
-        struct ForStatement for_statement;
-        struct MatchStatement match_statement;
-        struct Expression expression_statement;
-    };
-};
-
-// Parameter structure
-struct Parameter {
-    char* name;
-    Type type_annotation;
-};
-
-// Function structure
-struct Function {
-    char* name;
-    Vector* parameters;
-    Type return_type;
-    int32_t priority;
-    struct Block body;
-};
-
-// Field structure
-struct Field {
-    char* name;
-    Type type_annotation;
-};
-
-// TypeDefinition structure
-struct TypeDefinition {
-    char* name;
-    Vector* fields;
-};
-
-// AST structure
-struct AST {
-    Vector* functions;
-    Vector* type_definitions;
-};
-
-// AST functions
-AST* ast_new(void);
-void ast_free(AST* ast);
-void ast_add_function(AST* ast, Function* function);
-void ast_add_type_definition(AST* ast, TypeDefinition* type_def);
-
-#endif // SLANG_AST_H 
+#endif // AST_H 

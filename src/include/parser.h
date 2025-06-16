@@ -1,32 +1,32 @@
-#ifndef SLANG_PARSER_H
-#define SLANG_PARSER_H
+#ifndef PARSER_H
+#define PARSER_H
 
-#include "lexer.h"
 #include "ast.h"
-#include "error.h"
-#include <stdbool.h>
+#include "lexer.h"
 
 typedef struct {
     Lexer* lexer;
+    Token current_token;
+    Token previous_token;
+    bool had_error;
 } Parser;
 
-// Parser functions
-Parser* parser_new(Lexer* lexer);
-void parser_free(Parser* parser);
-SlangError* parser_parse(Parser* parser, AST* ast);
+// Function declarations
+Parser* create_parser(Lexer* lexer);
+void free_parser(Parser* parser);
+ASTNode* parse_program(Parser* parser);
+ASTNode* parse_statement(Parser* parser);
+ASTNode* parse_expression(Parser* parser);
+ASTNode* parse_primary(Parser* parser);
+ASTNode* parse_function_declaration(Parser* parser);
+ASTNode* parse_let_statement(Parser* parser);
+ASTNode* parse_if_statement(Parser* parser);
+ASTNode* parse_while_statement(Parser* parser);
+ASTNode* parse_block_statement(Parser* parser);
+ASTNode* parse_expression_statement(Parser* parser);
+ASTNode* parse_assignment(Parser* parser);
+ASTNode* parse_call_expression(Parser* parser);
+ASTNode* parse_binary_expression(Parser* parser, int precedence);
+ASTNode* parse_unary_expression(Parser* parser);
 
-// Helper functions
-SlangError* parser_parse_function(Parser* parser, Function* function);
-SlangError* parser_parse_type(Parser* parser, Type* type);
-SlangError* parser_parse_type_definition(Parser* parser, TypeDefinition* type_def);
-SlangError* parser_parse_pattern(Parser* parser, Pattern* pattern);
-SlangError* parser_parse_identifier(Parser* parser, char** identifier);
-SlangError* parser_parse_string(Parser* parser, char** string);
-SlangError* parser_parse_integer(Parser* parser, int32_t* integer);
-SlangError* parser_parse_float(Parser* parser, double* floating);
-SlangError* parser_parse_block(Parser* parser, Block* block);
-SlangError* parser_parse_statement(Parser* parser, Statement* statement);
-SlangError* parser_parse_expression(Parser* parser, Expression* expression);
-SlangError* parser_expect(Parser* parser, TokenType expected);
-
-#endif // SLANG_PARSER_H 
+#endif // PARSER_H 
