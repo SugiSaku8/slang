@@ -261,4 +261,8 @@ Token lexer_peek_token(Lexer* lexer) {
     Token token = lexer_next_token(lexer);
     lexer->current = current_position;
     return token;
+}
+
+bool lexer_is_at_end(Lexer* lexer) {
+    return lexer->source[lexer->current] == '\0';
 } 

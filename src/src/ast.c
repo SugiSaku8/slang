@@ -176,4 +176,55 @@ void free_ast_node(ASTNode* node) {
             break;
     }
     free(node);
+}
+
+AST* create_ast(void) {
+    AST* ast = (AST*)malloc(sizeof(AST));
+    if (ast == NULL) {
+        return NULL;
+    }
+    ast->functions = NULL;
+    ast->function_count = 0;
+    ast->type_definitions = NULL;
+    ast->type_definition_count = 0;
+    return ast;
+}
+
+void free_ast(AST* ast) {
+    if (!ast) return;
+    
+    // Free functions
+    for (size_t i = 0; i < ast->function_count; i++) {
+        Function* func = ast->functions[i];
+        free(func->name);
+        for (size_t j = 0; j < func->parameter_count; j++) {
+            free(func->parameters[j]->name);
+            free(func->parameters[j]);
+        }
+        free(func->parameters);
+        free_ast_node(func->body);
+        free(func);
+    }
+    free(ast->functions);
+    
+    // Free type definitions
+    for (size_t i = 0; i < ast->type_definition_count; i++) {
+        TypeDefinition* type_def = ast->type_definitions[i];
+        free(type_def->name);
+        free_type(type_def->type);
+        free(type_def);
+    }
+    free(ast->type_definitions);
+    
+    free(ast);
+}
+
+void ast_add_function(AST* ast, Function* function) {
+    ast->functions = realloc(ast->functions, (ast->function_count + 1) * sizeof(Function*));
+    ast->functions[ast->function_count++] = function;
+}
+
+void ast_add_type_definition(AST* ast, TypeDefinition* type_def) {
+    ast->type_definitions = realloc(ast->type_definitions, (ast->type_definition_count + 1) * sizeof(TypeDefinition*));
+    ast->type_definitions[ast->type_definition_count++] = type_def;
 } 

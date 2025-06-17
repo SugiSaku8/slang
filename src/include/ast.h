@@ -148,6 +148,11 @@ typedef struct ASTNode {
 } ASTNode;
 
 // Function declarations
+AST* create_ast(void);
+void free_ast(AST* ast);
+void ast_add_function(AST* ast, Function* function);
+void ast_add_type_definition(AST* ast, TypeDefinition* type_def);
+
 ASTNode* create_variable_node(const char* name, Type* type);
 ASTNode* create_function_node(const char* name, Type* return_type, Variable** parameters, size_t parameter_count, ASTNode* body);
 ASTNode* create_let_statement_node(const char* name, Type* type, ASTNode* initializer);

@@ -40,5 +40,7 @@ SlangError* parser_parse_function(Parser* parser, Function* function);
 SlangError* parser_parse_type_definition(Parser* parser, TypeDefinition* type_def);
 SlangError* parser_parse_integer(Parser* parser, int* value);
 SlangError* parser_parse_block(Parser* parser, ASTNode** block);
+SlangError* parser_parse_statement(Parser* parser, ASTNode** statement);
+SlangError* parser_parse_expression(Parser* parser, ASTNode** expression);
 
 #endif // PARSER_H 

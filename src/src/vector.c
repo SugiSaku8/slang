@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include "../include/vector.h"
 
 #define VECTOR_INITIAL_CAPACITY 16

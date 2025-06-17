@@ -5,22 +5,33 @@
 #include <stdlib.h>
 #include <string.h>
 
-Parser* parser_new(Lexer* lexer) {
+Parser* create_parser(Lexer* lexer) {
     Parser* parser = (Parser*)malloc(sizeof(Parser));
     if (parser == NULL) {
         return NULL;
     }
     parser->lexer = lexer;
+    parser->had_error = false;
+    parser->panic_mode = false;
     return parser;
 }
 
-void parser_free(Parser* parser) {
+void free_parser(Parser* parser) {
     if (parser != NULL) {
         free(parser);
     }
 }
 
-SlangError* parser_parse(Parser* parser, AST* ast) {
+ASTNode* parse_program(Parser* parser) {
+    AST* ast = (AST*)malloc(sizeof(AST));
+    if (ast == NULL) {
+        return NULL;
+    }
+    ast->functions = NULL;
+    ast->function_count = 0;
+    ast->type_definitions = NULL;
+    ast->type_definition_count = 0;
+
     while (!lexer_is_at_end(parser->lexer)) {
         Token token = lexer_peek_token(parser->lexer);
         
@@ -28,21 +39,24 @@ SlangError* parser_parse(Parser* parser, AST* ast) {
             Function function;
             SlangError* error = parser_parse_function(parser, &function);
             if (error != NULL) {
-                return error;
+                free(ast);
+                return NULL;
             }
             ast_add_function(ast, &function);
         } else if (token.type == TOKEN_TYPE) {
             TypeDefinition type_def;
             SlangError* error = parser_parse_type_definition(parser, &type_def);
             if (error != NULL) {
-                return error;
+                free(ast);
+                return NULL;
             }
             ast_add_type_definition(ast, &type_def);
         } else {
-            return slang_error_new(SLANG_ERROR_SYNTAX, "Unexpected token");
+            free(ast);
+            return NULL;
         }
     }
-    return NULL;
+    return create_block_statement_node(NULL, 0);
 }
 
 SlangError* parser_parse_function(Parser* parser, Function* function) {
@@ -58,7 +72,7 @@ SlangError* parser_parse_function(Parser* parser, Function* function) {
     }
     function->name = name;
 
-    error = parser_expect(parser, TOKEN_LPAREN);
+    error = parser_expect(parser, TOKEN_LEFT_PAREN);
     if (error != NULL) {
         return error;
     }
@@ -67,7 +81,7 @@ SlangError* parser_parse_function(Parser* parser, Function* function) {
     Vector* parameters = vector_new(sizeof(Parameter));
     token = lexer_peek_token(parser->lexer);
     
-    if (token.type != TOKEN_RPAREN) {
+    if (token.type != TOKEN_RIGHT_PAREN) {
         while (1) {
             Parameter param;
             error = parser_parse_identifier(parser, &param.name);
@@ -82,7 +96,7 @@ SlangError* parser_parse_function(Parser* parser, Function* function) {
                 return error;
             }
 
-            error = parser_parse_type(parser, &param.type_annotation);
+            error = parser_parse_type(parser, param.type_annotation);
             if (error != NULL) {
                 vector_free(parameters);
                 return error;
@@ -91,7 +105,7 @@ SlangError* parser_parse_function(Parser* parser, Function* function) {
             vector_push(parameters, &param);
 
             token = lexer_peek_token(parser->lexer);
-            if (token.type == TOKEN_RPAREN) {
+            if (token.type == TOKEN_RIGHT_PAREN) {
                 break;
             }
 
@@ -103,7 +117,7 @@ SlangError* parser_parse_function(Parser* parser, Function* function) {
         }
     }
 
-    error = parser_expect(parser, TOKEN_RPAREN);
+    error = parser_expect(parser, TOKEN_RIGHT_PAREN);
     if (error != NULL) {
         vector_free(parameters);
         return error;
@@ -115,7 +129,7 @@ SlangError* parser_parse_function(Parser* parser, Function* function) {
         return error;
     }
 
-    error = parser_parse_type(parser, &function->return_type);
+    error = parser_parse_type(parser, function->return_type);
     if (error != NULL) {
         vector_free(parameters);
         return error;
@@ -141,7 +155,7 @@ SlangError* parser_parse_function(Parser* parser, Function* function) {
         return error;
     }
 
-    function->parameters = parameters;
+    function->parameters = (Variable**)parameters;
     return NULL;
 }
 
@@ -150,273 +164,128 @@ SlangError* parser_parse_type(Parser* parser, Type* type) {
     
     if (token.type == TOKEN_IDENTIFIER) {
         type->kind = TYPE_NAMED;
-        type->named.name = strdup(token.value.string);
+        type->data.named.name = strdup(token.value.string);
         lexer_next_token(parser->lexer);
         return NULL;
     }
     
-    if (token.type == TOKEN_LBRACKET) {
+    if (token.type == TOKEN_LEFT_BRACKET) {
         lexer_next_token(parser->lexer);
         type->kind = TYPE_ARRAY;
-        type->array.element_type = (Type*)malloc(sizeof(Type));
-        SlangError* error = parser_parse_type(parser, type->array.element_type);
+        type->data.array.element_type = (Type*)malloc(sizeof(Type));
+        SlangError* error = parser_parse_type(parser, type->data.array.element_type);
         if (error != NULL) {
             return error;
         }
-        return parser_expect(parser, TOKEN_RBRACKET);
+        return parser_expect(parser, TOKEN_RIGHT_BRACKET);
     }
     
-    if (token.type == TOKEN_LPAREN) {
+    if (token.type == TOKEN_LEFT_PAREN) {
         lexer_next_token(parser->lexer);
         type->kind = TYPE_TUPLE;
-        type->tuple.types = vector_new(sizeof(Type));
+        Vector* types = vector_new(sizeof(Type));
         
         token = lexer_peek_token(parser->lexer);
-        if (token.type != TOKEN_RPAREN) {
+        if (token.type != TOKEN_RIGHT_PAREN) {
             while (1) {
                 Type element_type;
                 SlangError* error = parser_parse_type(parser, &element_type);
                 if (error != NULL) {
-                    vector_free(type->tuple.types);
+                    vector_free(types);
                     return error;
                 }
-                vector_push(type->tuple.types, &element_type);
+                vector_push(types, &element_type);
                 
                 token = lexer_peek_token(parser->lexer);
-                if (token.type == TOKEN_RPAREN) {
+                if (token.type == TOKEN_RIGHT_PAREN) {
                     break;
                 }
                 
                 error = parser_expect(parser, TOKEN_COMMA);
                 if (error != NULL) {
-                    vector_free(type->tuple.types);
+                    vector_free(types);
                     return error;
                 }
             }
         }
         
-        return parser_expect(parser, TOKEN_RPAREN);
+        type->data.tuple.types = (Type**)types;
+        type->data.tuple.type_count = types->size;
+        return parser_expect(parser, TOKEN_RIGHT_PAREN);
     }
     
-    return slang_error_new(SLANG_ERROR_SYNTAX, "Unexpected token in type");
+    return slang_error_new(SLANG_ERROR_SYNTAX, "Expected type");
 }
 
 SlangError* parser_parse_type_definition(Parser* parser, TypeDefinition* type_def) {
-    SlangError* error = parser_expect(parser, TOKEN_TYPE);
+    Token token = lexer_next_token(parser->lexer);
+    if (token.type != TOKEN_TYPE) {
+        return slang_error_new(SLANG_ERROR_SYNTAX, "Expected 'type' keyword");
+    }
+
+    SlangError* error = parser_parse_identifier(parser, &type_def->name);
     if (error != NULL) {
         return error;
     }
 
-    error = parser_parse_identifier(parser, &type_def->name);
+    error = parser_expect(parser, TOKEN_EQUAL);
     if (error != NULL) {
         return error;
     }
 
-    error = parser_expect(parser, TOKEN_EQUALS);
+    error = parser_parse_type(parser, type_def->type);
     if (error != NULL) {
-        return error;
-    }
-
-    // TODO: Parse fields properly
-    type_def->fields = vector_new(sizeof(Field));
-
-    error = parser_expect(parser, TOKEN_SEMICOLON);
-    if (error != NULL) {
-        vector_free(type_def->fields);
         return error;
     }
 
     return NULL;
 }
 
-SlangError* parser_parse_pattern(Parser* parser, Pattern* pattern) {
-    Token token = lexer_peek_token(parser->lexer);
-    
-    if (token.type == TOKEN_IDENTIFIER) {
-        pattern->kind = PATTERN_IDENTIFIER;
-        pattern->identifier = strdup(token.value.string);
-        lexer_next_token(parser->lexer);
-        return NULL;
-    }
-    
-    if (token.type == TOKEN_UNDERSCORE) {
-        pattern->kind = PATTERN_WILDCARD;
-        lexer_next_token(parser->lexer);
-        return NULL;
-    }
-    
-    if (token.type == TOKEN_LPAREN) {
-        lexer_next_token(parser->lexer);
-        pattern->kind = PATTERN_TUPLE;
-        pattern->tuple_patterns = vector_new(sizeof(Pattern));
-        
-        token = lexer_peek_token(parser->lexer);
-        if (token.type != TOKEN_RPAREN) {
-            while (1) {
-                Pattern element_pattern;
-                SlangError* error = parser_parse_pattern(parser, &element_pattern);
-                if (error != NULL) {
-                    vector_free(pattern->tuple_patterns);
-                    return error;
-                }
-                vector_push(pattern->tuple_patterns, &element_pattern);
-                
-                token = lexer_peek_token(parser->lexer);
-                if (token.type == TOKEN_RPAREN) {
-                    break;
-                }
-                
-                error = parser_expect(parser, TOKEN_COMMA);
-                if (error != NULL) {
-                    vector_free(pattern->tuple_patterns);
-                    return error;
-                }
-            }
-        }
-        
-        return parser_expect(parser, TOKEN_RPAREN);
-    }
-    
-    return slang_error_new(SLANG_ERROR_SYNTAX, "Unexpected token in pattern");
-}
-
-SlangError* parser_parse_identifier(Parser* parser, char** identifier) {
-    Token token = lexer_peek_token(parser->lexer);
+SlangError* parser_parse_identifier(Parser* parser, char** name) {
+    Token token = lexer_next_token(parser->lexer);
     if (token.type != TOKEN_IDENTIFIER) {
         return slang_error_new(SLANG_ERROR_SYNTAX, "Expected identifier");
     }
-    *identifier = strdup(token.value.string);
-    lexer_next_token(parser->lexer);
+    *name = strdup(token.value.string);
     return NULL;
 }
 
-SlangError* parser_parse_string(Parser* parser, char** string) {
-    Token token = lexer_peek_token(parser->lexer);
-    if (token.type != TOKEN_STRING_LITERAL) {
-        return slang_error_new(SLANG_ERROR_SYNTAX, "Expected string literal");
+SlangError* parser_parse_integer(Parser* parser, int* value) {
+    Token token = lexer_next_token(parser->lexer);
+    if (token.type != TOKEN_NUMBER) {
+        return slang_error_new(SLANG_ERROR_SYNTAX, "Expected number");
     }
-    *string = strdup(token.value.string);
-    lexer_next_token(parser->lexer);
+    *value = (int)token.value.number;
     return NULL;
 }
 
-SlangError* parser_parse_integer(Parser* parser, int32_t* integer) {
-    Token token = lexer_peek_token(parser->lexer);
-    if (token.type != TOKEN_INTEGER_LITERAL) {
-        return slang_error_new(SLANG_ERROR_SYNTAX, "Expected integer literal");
-    }
-    *integer = (int32_t)token.value.integer;
-    lexer_next_token(parser->lexer);
-    return NULL;
-}
-
-SlangError* parser_parse_float(Parser* parser, double* floating) {
-    Token token = lexer_peek_token(parser->lexer);
-    if (token.type != TOKEN_FLOAT_LITERAL) {
-        return slang_error_new(SLANG_ERROR_SYNTAX, "Expected float literal");
-    }
-    *floating = token.value.floating;
-    lexer_next_token(parser->lexer);
-    return NULL;
-}
-
-SlangError* parser_parse_block(Parser* parser, Block* block) {
-    SlangError* error = parser_expect(parser, TOKEN_LBRACE);
-    if (error != NULL) {
-        return error;
+SlangError* parser_parse_block(Parser* parser, ASTNode** block) {
+    Token token = lexer_next_token(parser->lexer);
+    if (token.type != TOKEN_LEFT_BRACE) {
+        return slang_error_new(SLANG_ERROR_SYNTAX, "Expected '{'");
     }
 
-    block->statements = vector_new(sizeof(Statement));
-    
+    Vector* statements = vector_new(sizeof(ASTNode*));
     while (1) {
-        Token token = lexer_peek_token(parser->lexer);
-        if (token.type == TOKEN_RBRACE) {
+        token = lexer_peek_token(parser->lexer);
+        if (token.type == TOKEN_RIGHT_BRACE) {
+            lexer_next_token(parser->lexer);
             break;
         }
-        
-        Statement statement;
-        error = parser_parse_statement(parser, &statement);
-        if (error != NULL) {
-            vector_free(block->statements);
-            return error;
-        }
-        
-        vector_push(block->statements, &statement);
-    }
-    
-    return parser_expect(parser, TOKEN_RBRACE);
-}
 
-SlangError* parser_parse_statement(Parser* parser, Statement* statement) {
-    Token token = lexer_peek_token(parser->lexer);
-    
-    if (token.type == TOKEN_LET) {
-        lexer_next_token(parser->lexer);
-        statement->kind = STATEMENT_LET;
-        
-        LetStatement* let_stmt = &statement->let_statement;
-        SlangError* error = parser_parse_identifier(parser, &let_stmt->name);
+        ASTNode* statement;
+        SlangError* error = parser_parse_statement(parser, &statement);
         if (error != NULL) {
+            vector_free(statements);
             return error;
         }
-        
-        token = lexer_peek_token(parser->lexer);
-        if (token.type == TOKEN_COLON) {
-            lexer_next_token(parser->lexer);
-            let_stmt->type_annotation = (Type*)malloc(sizeof(Type));
-            error = parser_parse_type(parser, let_stmt->type_annotation);
-            if (error != NULL) {
-                return error;
-            }
-        } else {
-            let_stmt->type_annotation = NULL;
-        }
-        
-        error = parser_expect(parser, TOKEN_EQUALS);
-        if (error != NULL) {
-            return error;
-        }
-        
-        let_stmt->value = (Expression*)malloc(sizeof(Expression));
-        error = parser_parse_expression(parser, let_stmt->value);
-        if (error != NULL) {
-            return error;
-        }
-        
-        return parser_expect(parser, TOKEN_SEMICOLON);
-    }
-    
-    if (token.type == TOKEN_RETURN) {
-        lexer_next_token(parser->lexer);
-        statement->kind = STATEMENT_RETURN;
-        
-        token = lexer_peek_token(parser->lexer);
-        if (token.type != TOKEN_SEMICOLON) {
-            statement->return_statement.value = (Expression*)malloc(sizeof(Expression));
-            SlangError* error = parser_parse_expression(parser, statement->return_statement.value);
-            if (error != NULL) {
-                return error;
-            }
-        } else {
-            statement->return_statement.value = NULL;
-        }
-        
-        return parser_expect(parser, TOKEN_SEMICOLON);
-    }
-    
-    // Expression statement
-    statement->kind = STATEMENT_EXPRESSION;
-    SlangError* error = parser_parse_expression(parser, &statement->expression_statement);
-    if (error != NULL) {
-        return error;
-    }
-    
-    return parser_expect(parser, TOKEN_SEMICOLON);
-}
 
-SlangError* parser_parse_expression(Parser* parser, Expression* expression) {
-    // TODO: Implement expression parsing
-    return slang_error_new(SLANG_ERROR_SYNTAX, "Expression parsing not implemented");
+        vector_push(statements, &statement);
+    }
+
+    *block = create_block_statement_node((ASTNode**)statements->data, statements->size);
+    vector_free(statements);
+    return NULL;
 }
 
 SlangError* parser_expect(Parser* parser, TokenType expected) {
@@ -425,4 +294,147 @@ SlangError* parser_expect(Parser* parser, TokenType expected) {
         return slang_error_new(SLANG_ERROR_SYNTAX, "Unexpected token");
     }
     return NULL;
+}
+
+SlangError* parser_parse_statement(Parser* parser, ASTNode** statement) {
+    SlangError* error = NULL;
+    Token token = lexer_peek_token(parser->lexer);
+    
+    if (token.type == TOKEN_VAR) {
+        lexer_next_token(parser->lexer);
+        
+        char* name;
+        error = parser_parse_identifier(parser, &name);
+        if (error != NULL) {
+            return error;
+        }
+        
+        Type* type = NULL;
+        token = lexer_peek_token(parser->lexer);
+        if (token.type == TOKEN_COLON) {
+            lexer_next_token(parser->lexer);
+            type = (Type*)malloc(sizeof(Type));
+            error = parser_parse_type(parser, type);
+            if (error != NULL) {
+                free(name);
+                return error;
+            }
+        }
+        
+        error = parser_expect(parser, TOKEN_EQUAL);
+        if (error != NULL) {
+            free(name);
+            if (type) free_type(type);
+            return error;
+        }
+        
+        ASTNode* initializer;
+        error = parser_parse_expression(parser, &initializer);
+        if (error != NULL) {
+            free(name);
+            if (type) free_type(type);
+            return error;
+        }
+        
+        *statement = create_let_statement_node(name, type, initializer);
+        return NULL;
+    }
+    
+    if (token.type == TOKEN_RETURN) {
+        lexer_next_token(parser->lexer);
+        
+        ASTNode* value = NULL;
+        token = lexer_peek_token(parser->lexer);
+        if (token.type != TOKEN_SEMICOLON) {
+            error = parser_parse_expression(parser, &value);
+            if (error != NULL) {
+                return error;
+            }
+        }
+        
+        *statement = create_expression_statement_node(value);
+        return NULL;
+    }
+    
+    // Expression statement
+    error = parser_parse_expression(parser, statement);
+    if (error != NULL) {
+        return error;
+    }
+    
+    return parser_expect(parser, TOKEN_SEMICOLON);
+}
+
+SlangError* parser_parse_expression(Parser* parser, ASTNode** expression) {
+    Token token = lexer_peek_token(parser->lexer);
+    
+    if (token.type == TOKEN_IDENTIFIER) {
+        char* name = strdup(token.value.string);
+        lexer_next_token(parser->lexer);
+        
+        token = lexer_peek_token(parser->lexer);
+        if (token.type == TOKEN_LEFT_PAREN) {
+            lexer_next_token(parser->lexer);
+            
+            Vector* arguments = vector_new(sizeof(ASTNode*));
+            token = lexer_peek_token(parser->lexer);
+            
+            if (token.type != TOKEN_RIGHT_PAREN) {
+                while (1) {
+                    ASTNode* argument;
+                    SlangError* error = parser_parse_expression(parser, &argument);
+                    if (error != NULL) {
+                        vector_free(arguments);
+                        free(name);
+                        return error;
+                    }
+                    
+                    vector_push(arguments, &argument);
+                    
+                    token = lexer_peek_token(parser->lexer);
+                    if (token.type == TOKEN_RIGHT_PAREN) {
+                        break;
+                    }
+                    
+                    error = parser_expect(parser, TOKEN_COMMA);
+                    if (error != NULL) {
+                        vector_free(arguments);
+                        free(name);
+                        return error;
+                    }
+                }
+            }
+            
+            lexer_next_token(parser->lexer);
+            *expression = create_function_call_node(name, (ASTNode**)arguments->data, arguments->size);
+            vector_free(arguments);
+            return NULL;
+        }
+        
+        *expression = create_variable_reference_node(name);
+        return NULL;
+    }
+    
+    if (token.type == TOKEN_NUMBER) {
+        int value = (int)token.value.number;
+        lexer_next_token(parser->lexer);
+        *expression = create_integer_literal_node(value);
+        return NULL;
+    }
+    
+    if (token.type == TOKEN_STRING) {
+        char* value = strdup(token.value.string);
+        lexer_next_token(parser->lexer);
+        *expression = create_string_literal_node(value);
+        return NULL;
+    }
+    
+    if (token.type == TOKEN_TRUE || token.type == TOKEN_FALSE) {
+        bool value = token.type == TOKEN_TRUE;
+        lexer_next_token(parser->lexer);
+        *expression = create_boolean_literal_node(value);
+        return NULL;
+    }
+    
+    return slang_error_new(SLANG_ERROR_SYNTAX, "Expected expression");
 } 
