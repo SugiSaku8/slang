@@ -8,10 +8,6 @@
 #include "type_system.h"
 #include <stdbool.h>
 
-// Token definitions
-#define TOKEN_LPAREN 1
-#define TOKEN_RPAREN 2
-
 // Parameter structure
 typedef struct {
     char* name;
@@ -28,9 +24,9 @@ typedef struct {
 } Parser;
 
 // Function declarations
-Parser* parser_new(Lexer* lexer);
-void parser_free(Parser* parser);
-AST* parser_parse(Parser* parser);
+Parser* create_parser(Lexer* lexer);
+void free_parser(Parser* parser);
+ASTNode* parse_program(Parser* parser);
 SlangError* parser_parse_type(Parser* parser, Type* type);
 SlangError* parser_parse_identifier(Parser* parser, char** name);
 SlangError* parser_expect(Parser* parser, TokenType type);
