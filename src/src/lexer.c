@@ -4,6 +4,7 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <stddef.h>
+#include <stdbool.h>
 
 // Helper functions
 static bool is_whitespace(char c) {

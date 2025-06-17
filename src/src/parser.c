@@ -1,4 +1,7 @@
 #include "parser.h"
+#include "../include/ast.h"
+#include "../include/vector.h"
+#include "../include/error.h"
 #include <stdlib.h>
 #include <string.h>
 

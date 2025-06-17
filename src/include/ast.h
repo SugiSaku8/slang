@@ -16,6 +16,7 @@ typedef struct {
     Variable** parameters;
     size_t parameter_count;
     struct ASTNode* body;
+    int priority;
 } Function;
 
 typedef struct {

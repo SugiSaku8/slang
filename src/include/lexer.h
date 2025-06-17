@@ -2,6 +2,7 @@
 #define LEXER_H
 
 #include <stddef.h>
+#include <stdbool.h>
 
 typedef enum {
     // Single-character tokens
@@ -10,6 +11,7 @@ typedef enum {
     TOKEN_LEFT_BRACKET, TOKEN_RIGHT_BRACKET,
     TOKEN_COMMA, TOKEN_DOT, TOKEN_MINUS, TOKEN_PLUS,
     TOKEN_SEMICOLON, TOKEN_SLASH, TOKEN_STAR,
+    TOKEN_COLON, TOKEN_ARROW,
 
     // One or two character tokens
     TOKEN_BANG, TOKEN_BANG_EQUAL,
@@ -54,5 +56,7 @@ typedef struct {
 Lexer* lexer_init(const char* source);
 void lexer_free(Lexer* lexer);
 Token lexer_next_token(Lexer* lexer);
+bool lexer_is_at_end(Lexer* lexer);
+Token lexer_peek_token(Lexer* lexer);
 
 #endif // LEXER_H 

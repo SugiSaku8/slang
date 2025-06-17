@@ -4,9 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
-
-// Forward declarations
-typedef struct Vector Vector;
+#include "vector.h"
 
 // Type kinds
 typedef enum {

@@ -35,7 +35,7 @@ int main(int argc, char** argv) {
     fclose(file);
 
     // Create lexer
-    Lexer* lexer = create_lexer(source);
+    Lexer* lexer = lexer_init(source);
     if (!lexer) {
         fprintf(stderr, "Error: Failed to create lexer\n");
         free(source);
@@ -46,7 +46,7 @@ int main(int argc, char** argv) {
     Parser* parser = create_parser(lexer);
     if (!parser) {
         fprintf(stderr, "Error: Failed to create parser\n");
-        free_lexer(lexer);
+        lexer_free(lexer);
         free(source);
         return 1;
     }
@@ -56,7 +56,7 @@ int main(int argc, char** argv) {
     if (!program) {
         fprintf(stderr, "Error: Failed to parse program\n");
         free_parser(parser);
-        free_lexer(lexer);
+        lexer_free(lexer);
         free(source);
         return 1;
     }
@@ -67,7 +67,7 @@ int main(int argc, char** argv) {
         fprintf(stderr, "Error: Failed to create interpreter\n");
         free_ast_node(program);
         free_parser(parser);
-        free_lexer(lexer);
+        lexer_free(lexer);
         free(source);
         return 1;
     }
@@ -79,7 +79,7 @@ int main(int argc, char** argv) {
     free_interpreter(interpreter);
     free_ast_node(program);
     free_parser(parser);
-    free_lexer(lexer);
+    lexer_free(lexer);
     free(source);
 
     return 0;
