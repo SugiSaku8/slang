@@ -1,5 +1,6 @@
 #include "../include/type_system.h"
 #include "../include/ast.h"
+#include "../include/common.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -9,6 +10,8 @@ Type* type_new(TypeKind kind) {
     Type* type = (Type*)malloc(sizeof(Type));
     if (!type) return NULL;
     type->kind = kind;
+    type->size = 0;
+    type->is_mutable = false;
     switch (kind) {
         case TYPE_ARRAY:
             type->data.array.element_type = NULL;
@@ -400,4 +403,114 @@ char* type_to_string(const Type* type) {
     }
     
     return result;
+}
+
+// Type inference
+Type* type_infer(ASTNode* node) {
+    if (node == NULL) return NULL;
+
+    switch (node->type) {
+        case NODE_LITERAL:
+            switch (node->as.literal.type) {
+                case LITERAL_INTEGER:
+                    return type_new(TYPE_INTEGER);
+                case LITERAL_FLOAT:
+                    return type_new(TYPE_FLOAT);
+                case LITERAL_STRING:
+                    return type_new(TYPE_STRING);
+                case LITERAL_BOOLEAN:
+                    return type_new(TYPE_BOOLEAN);
+                case LITERAL_NULL:
+                    return type_new(TYPE_VOID);
+            }
+            break;
+
+        case NODE_BINARY: {
+            Type* left_type = type_infer(node->as.binary.left);
+            Type* right_type = type_infer(node->as.binary.right);
+            
+            if (left_type == NULL || right_type == NULL) {
+                type_free(left_type);
+                type_free(right_type);
+                return NULL;
+            }
+
+            // Check operator type
+            switch (node->as.binary.operator) {
+                case TOKEN_PLUS:
+                case TOKEN_MINUS:
+                case TOKEN_STAR:
+                case TOKEN_SLASH:
+                    if (left_type->kind == TYPE_INTEGER && right_type->kind == TYPE_INTEGER) {
+                        type_free(right_type);
+                        return left_type;
+                    }
+                    if ((left_type->kind == TYPE_FLOAT || left_type->kind == TYPE_INTEGER) &&
+                        (right_type->kind == TYPE_FLOAT || right_type->kind == TYPE_INTEGER)) {
+                        type_free(left_type);
+                        return right_type;
+                    }
+                    break;
+
+                case TOKEN_EQ:
+                case TOKEN_NEQ:
+                case TOKEN_LT:
+                case TOKEN_GT:
+                case TOKEN_LE:
+                case TOKEN_GE:
+                    if (type_is_compatible_with(left_type, right_type)) {
+                        type_free(left_type);
+                        type_free(right_type);
+                        return type_new(TYPE_BOOLEAN);
+                    }
+                    break;
+            }
+
+            type_free(left_type);
+            type_free(right_type);
+            return NULL;
+        }
+
+        case NODE_UNARY: {
+            Type* operand_type = type_infer(node->as.unary.operand);
+            if (operand_type == NULL) return NULL;
+
+            switch (node->as.unary.operator) {
+                case TOKEN_MINUS:
+                    if (operand_type->kind == TYPE_INTEGER || operand_type->kind == TYPE_FLOAT) {
+                        return operand_type;
+                    }
+                    break;
+                case TOKEN_BANG:
+                    if (operand_type->kind == TYPE_BOOLEAN) {
+                        type_free(operand_type);
+                        return type_new(TYPE_BOOLEAN);
+                    }
+                    break;
+            }
+
+            type_free(operand_type);
+            return NULL;
+        }
+
+        // TODO: Implement type inference for other node types
+
+        default:
+            return NULL;
+    }
+
+    return NULL;
+}
+
+// Type checking
+SlangError type_check(ASTNode* node) {
+    if (node == NULL) return SLANG_SUCCESS;
+
+    Type* inferred_type = type_infer(node);
+    if (inferred_type == NULL) {
+        return SLANG_ERROR_TYPE;
+    }
+
+    type_free(inferred_type);
+    return SLANG_SUCCESS;
 } 

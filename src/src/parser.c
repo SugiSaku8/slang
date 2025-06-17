@@ -1,9 +1,229 @@
-#include "parser.h"
+#include "../include/parser.h"
 #include "../include/ast.h"
 #include "../include/vector.h"
 #include "../include/error.h"
 #include <stdlib.h>
 #include <string.h>
+
+// 構文解析器の作成
+Parser* parser_create(Lexer* lexer) {
+    Parser* parser = malloc(sizeof(Parser));
+    if (parser == NULL) return NULL;
+
+    parser->lexer = lexer;
+    parser->current = NULL;
+    parser->previous = NULL;
+    parser->errors = vector_create(sizeof(Error));
+    
+    if (parser->errors == NULL) {
+        free(parser);
+        return NULL;
+    }
+
+    return parser;
+}
+
+// 構文解析器の破棄
+void parser_destroy(Parser* parser) {
+    if (parser == NULL) return;
+    
+    // エラーメッセージを解放
+    for (size_t i = 0; i < vector_size(parser->errors); i++) {
+        Error* error = vector_get(parser->errors, i);
+        free(error->message);
+        free(error->file);
+    }
+    
+    vector_destroy(parser->errors);
+    free(parser);
+}
+
+// エラーの追加
+static void parser_error(Parser* parser, ErrorType type, const char* message) {
+    Error error;
+    error.type = type;
+    error.message = strdup(message);
+    error.line = parser->current->line;
+    error.column = parser->current->column;
+    error.file = NULL; // TODO: ファイル名を設定
+    
+    vector_push(parser->errors, &error);
+}
+
+// 次のトークンを消費
+static bool parser_advance(Parser* parser) {
+    parser->previous = parser->current;
+    parser->current = lexer_next_token(parser->lexer);
+    return parser->current != NULL;
+}
+
+// 現在のトークンの種類を確認
+static bool parser_check(Parser* parser, TokenType type) {
+    if (parser->current == NULL) return false;
+    return parser->current->type == type;
+}
+
+// 現在のトークンの種類を確認して消費
+static bool parser_match(Parser* parser, TokenType type) {
+    if (parser_check(parser, type)) {
+        parser_advance(parser);
+        return true;
+    }
+    return false;
+}
+
+// 現在のトークンの種類を確認して消費（エラー処理付き）
+static bool parser_consume(Parser* parser, TokenType type, const char* message) {
+    if (parser_check(parser, type)) {
+        parser_advance(parser);
+        return true;
+    }
+    
+    parser_error(parser, ERROR_SYNTAX, message);
+    return false;
+}
+
+// 式の解析
+static SlangError parser_expression(Parser* parser, ASTNode** expr) {
+    // TODO: 式の解析を実装
+    return SLANG_SUCCESS;
+}
+
+// 文の解析
+static SlangError parser_statement(Parser* parser, ASTNode** stmt) {
+    if (parser_match(parser, TOKEN_LET)) {
+        // 変数宣言
+        // TODO: 変数宣言の解析を実装
+    } else if (parser_match(parser, TOKEN_IF)) {
+        // if文
+        // TODO: if文の解析を実装
+    } else if (parser_match(parser, TOKEN_WHILE)) {
+        // while文
+        // TODO: while文の解析を実装
+    } else if (parser_match(parser, TOKEN_FOR)) {
+        // for文
+        // TODO: for文の解析を実装
+    } else if (parser_match(parser, TOKEN_RETURN)) {
+        // return文
+        // TODO: return文の解析を実装
+    } else if (parser_match(parser, TOKEN_BREAK)) {
+        // break文
+        // TODO: break文の解析を実装
+    } else if (parser_match(parser, TOKEN_CONTINUE)) {
+        // continue文
+        // TODO: continue文の解析を実装
+    } else {
+        // 式文
+        // TODO: 式文の解析を実装
+    }
+    
+    return SLANG_SUCCESS;
+}
+
+// 関数宣言の解析
+static SlangError parser_function(Parser* parser, ASTNode** func) {
+    // TODO: 関数宣言の解析を実装
+    return SLANG_SUCCESS;
+}
+
+// 構造体宣言の解析
+static SlangError parser_struct(Parser* parser, ASTNode** struct_decl) {
+    // TODO: 構造体宣言の解析を実装
+    return SLANG_SUCCESS;
+}
+
+// 実装宣言の解析
+static SlangError parser_impl(Parser* parser, ASTNode** impl_decl) {
+    // TODO: 実装宣言の解析を実装
+    return SLANG_SUCCESS;
+}
+
+// トレイト宣言の解析
+static SlangError parser_trait(Parser* parser, ASTNode** trait_decl) {
+    // TODO: トレイト宣言の解析を実装
+    return SLANG_SUCCESS;
+}
+
+// 宣言の解析
+static SlangError parser_declaration(Parser* parser, ASTNode** decl) {
+    if (parser_match(parser, TOKEN_FN)) {
+        return parser_function(parser, decl);
+    } else if (parser_match(parser, TOKEN_STRUCT)) {
+        return parser_struct(parser, decl);
+    } else if (parser_match(parser, TOKEN_IMPL)) {
+        return parser_impl(parser, decl);
+    } else if (parser_match(parser, TOKEN_TRAIT)) {
+        return parser_trait(parser, decl);
+    } else {
+        return parser_statement(parser, decl);
+    }
+}
+
+// プログラムの解析
+SlangError parser_parse(Parser* parser, ASTNode** ast) {
+    // 最初のトークンを取得
+    parser_advance(parser);
+    
+    // プログラムノードを作成
+    *ast = ast_create_node(NODE_PROGRAM, 1, 1);
+    if (*ast == NULL) {
+        return SLANG_ERROR_INTERNAL;
+    }
+    
+    // 宣言を解析
+    Vector* declarations = vector_create(sizeof(ASTNode*));
+    if (declarations == NULL) {
+        ast_destroy_node(*ast);
+        return SLANG_ERROR_INTERNAL;
+    }
+    
+    while (!parser_check(parser, TOKEN_EOF)) {
+        ASTNode* decl = NULL;
+        SlangError error = parser_declaration(parser, &decl);
+        
+        if (error != SLANG_SUCCESS) {
+            vector_destroy(declarations);
+            ast_destroy_node(*ast);
+            return error;
+        }
+        
+        if (decl != NULL) {
+            vector_push(declarations, &decl);
+        }
+    }
+    
+    (*ast)->as.program.declarations = declarations;
+    return SLANG_SUCCESS;
+}
+
+// エラーの有無を確認
+bool parser_had_error(Parser* parser) {
+    return vector_size(parser->errors) > 0;
+}
+
+// エラーからの回復
+void parser_synchronize(Parser* parser) {
+    while (!parser_check(parser, TOKEN_EOF)) {
+        if (parser->previous->type == TOKEN_SEMICOLON) return;
+        
+        switch (parser->current->type) {
+            case TOKEN_FN:
+            case TOKEN_STRUCT:
+            case TOKEN_IMPL:
+            case TOKEN_TRAIT:
+            case TOKEN_LET:
+            case TOKEN_IF:
+            case TOKEN_WHILE:
+            case TOKEN_FOR:
+            case TOKEN_RETURN:
+                return;
+            default:
+                break;
+        }
+        
+        parser_advance(parser);
+    }
+}
 
 Parser* create_parser(Lexer* lexer) {
     Parser* parser = (Parser*)malloc(sizeof(Parser));

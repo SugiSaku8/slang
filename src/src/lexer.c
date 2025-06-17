@@ -1,4 +1,5 @@
 #include "../include/lexer.h"
+#include "../include/common.h"
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
@@ -265,4 +266,284 @@ Token lexer_peek_token(Lexer* lexer) {
 
 bool lexer_is_at_end(Lexer* lexer) {
     return lexer->source[lexer->current] == '\0';
+}
+
+// キーワードの定義
+typedef struct {
+    const char* keyword;
+    TokenType type;
+} Keyword;
+
+static const Keyword keywords[] = {
+    {"fn", TOKEN_FN},
+    {"let", TOKEN_LET},
+    {"if", TOKEN_IF},
+    {"else", TOKEN_ELSE},
+    {"while", TOKEN_WHILE},
+    {"for", TOKEN_FOR},
+    {"return", TOKEN_RETURN},
+    {"break", TOKEN_BREAK},
+    {"continue", TOKEN_CONTINUE},
+    {"struct", TOKEN_STRUCT},
+    {"impl", TOKEN_IMPL},
+    {"trait", TOKEN_TRAIT},
+    {"use", TOKEN_USE},
+    {"pub", TOKEN_PUB},
+    {"priv", TOKEN_PRIV},
+    {NULL, 0}
+};
+
+// 字句解析器の作成
+Lexer* lexer_create(const char* source) {
+    Lexer* lexer = malloc(sizeof(Lexer));
+    if (lexer == NULL) return NULL;
+
+    lexer->source = source;
+    lexer->start = 0;
+    lexer->current = 0;
+    lexer->line = 1;
+    lexer->column = 1;
+    lexer->tokens = vector_create(sizeof(Token));
+    
+    if (lexer->tokens == NULL) {
+        free(lexer);
+        return NULL;
+    }
+
+    return lexer;
+}
+
+// 字句解析器の破棄
+void lexer_destroy(Lexer* lexer) {
+    if (lexer == NULL) return;
+    
+    // トークンの文字列を解放
+    for (size_t i = 0; i < vector_size(lexer->tokens); i++) {
+        Token* token = vector_get(lexer->tokens, i);
+        free(token->lexeme);
+    }
+    
+    vector_destroy(lexer->tokens);
+    free(lexer);
+}
+
+// 現在の文字を取得
+static char lexer_current(const Lexer* lexer) {
+    return lexer->source[lexer->current];
+}
+
+// 次の文字を取得
+static char lexer_advance(Lexer* lexer) {
+    char c = lexer_current(lexer);
+    lexer->current++;
+    lexer->column++;
+    return c;
+}
+
+// 次の文字を確認
+static char lexer_peek(const Lexer* lexer) {
+    return lexer->source[lexer->current];
+}
+
+// 次の次の文字を確認
+static char lexer_peek_next(const Lexer* lexer) {
+    if (lexer->current + 1 >= strlen(lexer->source)) return '\0';
+    return lexer->source[lexer->current + 1];
+}
+
+// 現在のトークンの文字列を取得
+static char* lexer_get_lexeme(const Lexer* lexer) {
+    size_t length = lexer->current - lexer->start;
+    char* lexeme = malloc(length + 1);
+    if (lexeme == NULL) return NULL;
+    
+    strncpy(lexeme, lexer->source + lexer->start, length);
+    lexeme[length] = '\0';
+    return lexeme;
+}
+
+// トークンの追加
+static bool lexer_add_token(Lexer* lexer, TokenType type) {
+    Token token;
+    token.type = type;
+    token.lexeme = lexer_get_lexeme(lexer);
+    token.line = lexer->line;
+    token.column = lexer->column - (lexer->current - lexer->start);
+    
+    return vector_push(lexer->tokens, &token);
+}
+
+// 識別子の解析
+static void lexer_identifier(Lexer* lexer) {
+    while (isalnum(lexer_peek(lexer)) || lexer_peek(lexer) == '_') {
+        lexer_advance(lexer);
+    }
+
+    // キーワードの確認
+    char* lexeme = lexer_get_lexeme(lexer);
+    TokenType type = TOKEN_IDENTIFIER;
+    
+    for (const Keyword* kw = keywords; kw->keyword != NULL; kw++) {
+        if (strcmp(lexeme, kw->keyword) == 0) {
+            type = kw->type;
+            break;
+        }
+    }
+    
+    free(lexeme);
+    lexer_add_token(lexer, type);
+}
+
+// 数値の解析
+static void lexer_number(Lexer* lexer) {
+    while (isdigit(lexer_peek(lexer))) {
+        lexer_advance(lexer);
+    }
+
+    // 小数点の確認
+    if (lexer_peek(lexer) == '.' && isdigit(lexer_peek_next(lexer))) {
+        lexer_advance(lexer); // 小数点を消費
+        
+        while (isdigit(lexer_peek(lexer))) {
+            lexer_advance(lexer);
+        }
+        
+        lexer_add_token(lexer, TOKEN_FLOAT);
+    } else {
+        lexer_add_token(lexer, TOKEN_INTEGER);
+    }
+}
+
+// 文字列の解析
+static void lexer_string(Lexer* lexer) {
+    while (lexer_peek(lexer) != '"' && lexer_peek(lexer) != '\0') {
+        if (lexer_peek(lexer) == '\n') {
+            lexer->line++;
+            lexer->column = 1;
+        }
+        lexer_advance(lexer);
+    }
+
+    if (lexer_peek(lexer) == '\0') {
+        // エラー: 文字列が終了していない
+        lexer_add_token(lexer, TOKEN_ERROR);
+        return;
+    }
+
+    // 閉じ引用符を消費
+    lexer_advance(lexer);
+    
+    // 文字列リテラルをトークンとして追加
+    lexer_add_token(lexer, TOKEN_STRING);
+}
+
+// コメントの解析
+static void lexer_comment(Lexer* lexer) {
+    while (lexer_peek(lexer) != '\n' && lexer_peek(lexer) != '\0') {
+        lexer_advance(lexer);
+    }
+}
+
+// トークンのスキャン
+SlangError lexer_scan(Lexer* lexer) {
+    while (lexer_peek(lexer) != '\0') {
+        lexer->start = lexer->current;
+        char c = lexer_advance(lexer);
+
+        switch (c) {
+            case '(': lexer_add_token(lexer, TOKEN_LPAREN); break;
+            case ')': lexer_add_token(lexer, TOKEN_RPAREN); break;
+            case '{': lexer_add_token(lexer, TOKEN_LBRACE); break;
+            case '}': lexer_add_token(lexer, TOKEN_RBRACE); break;
+            case ';': lexer_add_token(lexer, TOKEN_SEMICOLON); break;
+            case ',': lexer_add_token(lexer, TOKEN_COMMA); break;
+            case '.': lexer_add_token(lexer, TOKEN_DOT); break;
+            case '-': 
+                if (lexer_peek(lexer) == '>') {
+                    lexer_advance(lexer);
+                    lexer_add_token(lexer, TOKEN_ARROW);
+                } else {
+                    lexer_add_token(lexer, TOKEN_MINUS);
+                }
+                break;
+            case '+': lexer_add_token(lexer, TOKEN_PLUS); break;
+            case '*': lexer_add_token(lexer, TOKEN_STAR); break;
+            case '/':
+                if (lexer_peek(lexer) == '/') {
+                    lexer_comment(lexer);
+                } else {
+                    lexer_add_token(lexer, TOKEN_SLASH);
+                }
+                break;
+            case '%': lexer_add_token(lexer, TOKEN_PERCENT); break;
+            case '=':
+                if (lexer_peek(lexer) == '=') {
+                    lexer_advance(lexer);
+                    lexer_add_token(lexer, TOKEN_EQ);
+                } else {
+                    lexer_add_token(lexer, TOKEN_EQUAL);
+                }
+                break;
+            case '!':
+                if (lexer_peek(lexer) == '=') {
+                    lexer_advance(lexer);
+                    lexer_add_token(lexer, TOKEN_NEQ);
+                }
+                break;
+            case '<':
+                if (lexer_peek(lexer) == '=') {
+                    lexer_advance(lexer);
+                    lexer_add_token(lexer, TOKEN_LE);
+                } else {
+                    lexer_add_token(lexer, TOKEN_LT);
+                }
+                break;
+            case '>':
+                if (lexer_peek(lexer) == '=') {
+                    lexer_advance(lexer);
+                    lexer_add_token(lexer, TOKEN_GE);
+                } else {
+                    lexer_add_token(lexer, TOKEN_GT);
+                }
+                break;
+            case '"': lexer_string(lexer); break;
+            case ' ':
+            case '\r':
+            case '\t':
+                // 空白は無視
+                break;
+            case '\n':
+                lexer->line++;
+                lexer->column = 1;
+                break;
+            default:
+                if (isdigit(c)) {
+                    lexer_number(lexer);
+                } else if (isalpha(c) || c == '_') {
+                    lexer_identifier(lexer);
+                } else {
+                    // エラー: 不正な文字
+                    lexer_add_token(lexer, TOKEN_ERROR);
+                }
+                break;
+        }
+    }
+
+    // EOFトークンを追加
+    lexer_add_token(lexer, TOKEN_EOF);
+    return SLANG_SUCCESS;
+}
+
+// 次のトークンを取得
+Token* lexer_next_token(Lexer* lexer) {
+    static size_t current = 0;
+    if (current >= vector_size(lexer->tokens)) return NULL;
+    return vector_get(lexer->tokens, current++);
+}
+
+// 次のトークンを確認
+Token* lexer_peek_token(Lexer* lexer) {
+    static size_t current = 0;
+    if (current >= vector_size(lexer->tokens)) return NULL;
+    return vector_get(lexer->tokens, current);
 } 

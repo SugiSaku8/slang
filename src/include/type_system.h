@@ -1,90 +1,68 @@
-#ifndef TYPE_SYSTEM_H
-#define TYPE_SYSTEM_H
+#ifndef SLANG_TYPE_SYSTEM_H
+#define SLANG_TYPE_SYSTEM_H
 
-#include <stdbool.h>
-#include <stdint.h>
-#include <stddef.h>
-#include "vector.h"
+#include "common.h"
+#include "ast.h"
 
-// Type kinds
+// 型の種類
 typedef enum {
+    TYPE_VOID,
     TYPE_INTEGER,
     TYPE_FLOAT,
-    TYPE_STRING,
     TYPE_BOOLEAN,
-    TYPE_FUNCTION,
-    TYPE_VOID,
-    TYPE_UNKNOWN,
-    TYPE_NAMED,
+    TYPE_STRING,
     TYPE_ARRAY,
-    TYPE_TUPLE,
-    TYPE_VECTOR,
-    TYPE_MATRIX,
-    TYPE_TENSOR,
-    TYPE_QUATERNION,
-    TYPE_COMPLEX
+    TYPE_STRUCT,
+    TYPE_FUNCTION,
+    TYPE_TRAIT,
+    TYPE_GENERIC,
+    TYPE_ERROR
 } TypeKind;
 
-// Type structure
+// 型の構造体
 typedef struct Type {
     TypeKind kind;
+    size_t size;
+    bool is_mutable;
     union {
+        // 配列型
+        struct {
+            struct Type* element_type;
+            size_t length;
+        } array;
+        
+        // 構造体型
         struct {
             char* name;
-        } named;
+            Vector* fields;
+        } structure;
+        
+        // 関数型
         struct {
+            Vector* parameter_types;
             struct Type* return_type;
-            struct Type** parameter_types;
-            size_t parameter_count;
         } function;
+        
+        // トレイト型
         struct {
-            struct Type* element_type;
-        } array;
+            char* name;
+            Vector* methods;
+        } trait;
+        
+        // ジェネリック型
         struct {
-            struct Type** types;
-            size_t type_count;
-        } tuple;
-        struct {
-            struct Type* element_type;
-            size_t dimension;
-        } vector;
-        struct {
-            struct Type* element_type;
-            size_t rows;
-            size_t columns;
-        } matrix;
-        struct {
-            struct Type* element_type;
-            size_t* dimensions;
-            size_t dimension_count;
-        } tensor;
-        struct {
-            struct Type* element_type;
-        } quaternion;
-        struct {
-            struct Type* element_type;
-        } complex;
-    } data;
+            char* name;
+            Vector* type_parameters;
+        } generic;
+    } as;
 } Type;
 
-// Field structure for type definitions
-typedef struct {
-    char* name;
-    Type* type;
-} Field;
+// 型システムの関数
+Type* type_create(TypeKind kind);
+void type_destroy(Type* type);
+bool type_equals(const Type* a, const Type* b);
+Type* type_infer(ASTNode* node);
+SlangError type_check(ASTNode* node);
+char* type_to_string(const Type* type);
 
-// Type system functions
-Type* create_integer_type(void);
-Type* create_float_type(void);
-Type* create_string_type(void);
-Type* create_boolean_type(void);
-Type* create_function_type(Type* return_type, Type** parameter_types, size_t parameter_count);
-Type* create_void_type(void);
-Type* create_unknown_type(void);
-Type* create_array_type(Type* element_type);
-Type* create_tuple_type(Type** types, size_t type_count);
-
-bool types_are_compatible(Type* t1, Type* t2);
-void free_type(Type* type);
-
-#endif // TYPE_SYSTEM_H 
+#endif // SLANG_TYPE_SYSTEM_H 

@@ -1,8 +1,8 @@
-#ifndef PARSER_H
-#define PARSER_H
+#ifndef SLANG_PARSER_H
+#define SLANG_PARSER_H
 
-#include "ast.h"
 #include "lexer.h"
+#include "ast.h"
 #include "vector.h"
 #include "error.h"
 #include "type_system.h"
@@ -17,19 +17,17 @@ typedef struct {
 // Parser structure
 typedef struct {
     Lexer* lexer;
-    Token current;
-    Token previous;
-    bool had_error;
-    bool panic_mode;
+    Token* current;
+    Token* previous;
+    Vector* errors;
 } Parser;
 
 // Function declarations
-Parser* create_parser(Lexer* lexer);
-void free_parser(Parser* parser);
-ASTNode* parse_program(Parser* parser);
-SlangError* parser_parse_type(Parser* parser, Type* type);
-SlangError* parser_parse_identifier(Parser* parser, char** name);
-SlangError* parser_expect(Parser* parser, TokenType type);
+Parser* parser_create(Lexer* lexer);
+void parser_destroy(Parser* parser);
+SlangError parser_parse(Parser* parser, ASTNode** ast);
+bool parser_had_error(Parser* parser);
+void parser_synchronize(Parser* parser);
 
 // AST manipulation functions
 void ast_add_function(AST* ast, Function* function);
@@ -43,4 +41,4 @@ SlangError* parser_parse_block(Parser* parser, ASTNode** block);
 SlangError* parser_parse_statement(Parser* parser, ASTNode** statement);
 SlangError* parser_parse_expression(Parser* parser, ASTNode** expression);
 
-#endif // PARSER_H 
+#endif // SLANG_PARSER_H 

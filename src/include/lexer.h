@@ -1,62 +1,76 @@
-#ifndef LEXER_H
-#define LEXER_H
+#ifndef SLANG_LEXER_H
+#define SLANG_LEXER_H
 
-#include <stddef.h>
-#include <stdbool.h>
+#include "common.h"
 
+// トークンの種類
 typedef enum {
-    // Single-character tokens
-    TOKEN_LEFT_PAREN, TOKEN_RIGHT_PAREN,
-    TOKEN_LEFT_BRACE, TOKEN_RIGHT_BRACE,
-    TOKEN_LEFT_BRACKET, TOKEN_RIGHT_BRACKET,
-    TOKEN_COMMA, TOKEN_DOT, TOKEN_MINUS, TOKEN_PLUS,
-    TOKEN_SEMICOLON, TOKEN_SLASH, TOKEN_STAR,
-    TOKEN_COLON, TOKEN_ARROW,
-
-    // One or two character tokens
-    TOKEN_BANG, TOKEN_BANG_EQUAL,
-    TOKEN_EQUAL, TOKEN_EQUAL_EQUAL,
-    TOKEN_GREATER, TOKEN_GREATER_EQUAL,
-    TOKEN_LESS, TOKEN_LESS_EQUAL,
-
-    // Literals
-    TOKEN_IDENTIFIER, TOKEN_STRING, TOKEN_NUMBER,
-
-    // Keywords
-    TOKEN_AND, TOKEN_CLASS, TOKEN_ELSE, TOKEN_FALSE,
-    TOKEN_FOR, TOKEN_FUNCTION, TOKEN_IF, TOKEN_IN,
-    TOKEN_MATCH, TOKEN_NULL, TOKEN_OR,
-    TOKEN_PRINT, TOKEN_RETURN, TOKEN_SUPER, TOKEN_THIS,
-    TOKEN_TRUE, TOKEN_TYPE, TOKEN_PRIORITY, TOKEN_MOST_HIGH,
-    TOKEN_VAR, TOKEN_WHILE,
-
-    TOKEN_ERROR,
-    TOKEN_EOF
+    TOKEN_EOF,
+    TOKEN_IDENTIFIER,
+    TOKEN_INTEGER,
+    TOKEN_FLOAT,
+    TOKEN_STRING,
+    TOKEN_PLUS,      // +
+    TOKEN_MINUS,     // -
+    TOKEN_STAR,      // *
+    TOKEN_SLASH,     // /
+    TOKEN_PERCENT,   // %
+    TOKEN_EQUAL,     // =
+    TOKEN_EQ,        // ==
+    TOKEN_NEQ,       // !=
+    TOKEN_LT,        // <
+    TOKEN_GT,        // >
+    TOKEN_LE,        // <=
+    TOKEN_GE,        // >=
+    TOKEN_LPAREN,    // (
+    TOKEN_RPAREN,    // )
+    TOKEN_LBRACE,    // {
+    TOKEN_RBRACE,    // }
+    TOKEN_SEMICOLON, // ;
+    TOKEN_COMMA,     // ,
+    TOKEN_DOT,       // .
+    TOKEN_ARROW,     // ->
+    TOKEN_FN,        // fn
+    TOKEN_LET,       // let
+    TOKEN_IF,        // if
+    TOKEN_ELSE,      // else
+    TOKEN_WHILE,     // while
+    TOKEN_FOR,       // for
+    TOKEN_RETURN,    // return
+    TOKEN_BREAK,     // break
+    TOKEN_CONTINUE,  // continue
+    TOKEN_STRUCT,    // struct
+    TOKEN_IMPL,      // impl
+    TOKEN_TRAIT,     // trait
+    TOKEN_USE,       // use
+    TOKEN_PUB,       // pub
+    TOKEN_PRIV,      // priv
+    TOKEN_ERROR
 } TokenType;
 
+// トークンの構造体
 typedef struct {
     TokenType type;
-    const char* start;
-    size_t length;
-    int line;
-    union {
-        double number;
-        char* string;
-    } value;
+    char* lexeme;
+    size_t line;
+    size_t column;
 } Token;
 
+// 字句解析器の構造体
 typedef struct {
     const char* source;
     size_t start;
     size_t current;
-    int line;
+    size_t line;
+    size_t column;
+    Vector* tokens;
 } Lexer;
 
-// Function declarations
-Lexer* lexer_init(const char* source);
-void lexer_free(Lexer* lexer);
-Token lexer_next_token(Lexer* lexer);
-bool lexer_is_at_end(Lexer* lexer);
-Token lexer_peek_token(Lexer* lexer);
+// 字句解析器の関数
+Lexer* lexer_create(const char* source);
+void lexer_destroy(Lexer* lexer);
+SlangError lexer_scan(Lexer* lexer);
+Token* lexer_next_token(Lexer* lexer);
+Token* lexer_peek_token(Lexer* lexer);
 
-#endif // LEXER_H 
+#endif // SLANG_LEXER_H 

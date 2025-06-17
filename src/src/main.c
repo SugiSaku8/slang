@@ -1,86 +1,119 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include "../include/common.h"
 #include "../include/lexer.h"
 #include "../include/parser.h"
-#include "../include/interpreter.h"
+#include "../include/ast.h"
+#include "../include/type_system.h"
+#include "../include/error.h"
 
-int main(int argc, char** argv) {
-    if (argc != 2) {
-        fprintf(stderr, "Usage: %s <source_file>\n", argv[0]);
-        return 1;
+// ファイルの内容を読み込む
+char* read_file(const char* path) {
+    FILE* file = fopen(path, "rb");
+    if (file == NULL) {
+        fprintf(stderr, "Error: Could not open file '%s'\n", path);
+        exit(74);
     }
 
-    // Read source file
-    FILE* file = fopen(argv[1], "r");
-    if (!file) {
-        fprintf(stderr, "Error: Could not open file '%s'\n", argv[1]);
-        return 1;
+    fseek(file, 0L, SEEK_END);
+    size_t file_size = ftell(file);
+    rewind(file);
+
+    char* buffer = malloc(file_size + 1);
+    if (buffer == NULL) {
+        fprintf(stderr, "Error: Not enough memory to read '%s'\n", path);
+        exit(74);
     }
 
-    // Get file size
-    fseek(file, 0, SEEK_END);
-    long file_size = ftell(file);
-    fseek(file, 0, SEEK_SET);
-
-    // Read file content
-    char* source = (char*)malloc(file_size + 1);
-    if (!source) {
-        fprintf(stderr, "Error: Memory allocation failed\n");
-        fclose(file);
-        return 1;
+    size_t bytes_read = fread(buffer, sizeof(char), file_size, file);
+    if (bytes_read < file_size) {
+        fprintf(stderr, "Error: Could not read file '%s'\n", path);
+        exit(74);
     }
 
-    size_t read_size = fread(source, 1, file_size, file);
-    source[read_size] = '\0';
+    buffer[bytes_read] = '\0';
     fclose(file);
+    return buffer;
+}
 
-    // Create lexer
-    Lexer* lexer = lexer_init(source);
-    if (!lexer) {
-        fprintf(stderr, "Error: Failed to create lexer\n");
-        free(source);
-        return 1;
+// コンパイル処理
+SlangError compile(const char* source, const char* output_path) {
+    // 字句解析
+    Lexer* lexer = lexer_create(source);
+    if (lexer == NULL) {
+        return SLANG_ERROR_INTERNAL;
     }
 
-    // Create parser
-    Parser* parser = create_parser(lexer);
-    if (!parser) {
-        fprintf(stderr, "Error: Failed to create parser\n");
-        lexer_free(lexer);
-        free(source);
-        return 1;
+    SlangError error = lexer_scan(lexer);
+    if (error != SLANG_SUCCESS) {
+        lexer_destroy(lexer);
+        return error;
     }
 
-    // Parse program
-    ASTNode* program = parse_program(parser);
-    if (!program) {
-        fprintf(stderr, "Error: Failed to parse program\n");
-        free_parser(parser);
-        lexer_free(lexer);
-        free(source);
-        return 1;
+    // 構文解析
+    Parser* parser = parser_create(lexer);
+    if (parser == NULL) {
+        lexer_destroy(lexer);
+        return SLANG_ERROR_INTERNAL;
     }
 
-    // Create interpreter
-    Interpreter* interpreter = create_interpreter();
-    if (!interpreter) {
-        fprintf(stderr, "Error: Failed to create interpreter\n");
-        free_ast_node(program);
-        free_parser(parser);
-        lexer_free(lexer);
-        free(source);
-        return 1;
+    ASTNode* ast = NULL;
+    error = parser_parse(parser, &ast);
+    if (error != SLANG_SUCCESS) {
+        parser_destroy(parser);
+        lexer_destroy(lexer);
+        return error;
     }
 
-    // Interpret program
-    interpret(interpreter, program);
+    // 型チェック
+    error = type_check(ast);
+    if (error != SLANG_SUCCESS) {
+        ast_destroy_node(ast);
+        parser_destroy(parser);
+        lexer_destroy(lexer);
+        return error;
+    }
 
-    // Cleanup
-    free_interpreter(interpreter);
-    free_ast_node(program);
-    free_parser(parser);
-    lexer_free(lexer);
+    // TODO: コード生成
+
+    // クリーンアップ
+    ast_destroy_node(ast);
+    parser_destroy(parser);
+    lexer_destroy(lexer);
+
+    return SLANG_SUCCESS;
+}
+
+int main(int argc, char* argv[]) {
+    if (argc != 2) {
+        fprintf(stderr, "Usage: slangc <source_file>\n");
+        return 64;
+    }
+
+    const char* source_path = argv[1];
+    char* source = read_file(source_path);
+    if (source == NULL) {
+        return 74;
+    }
+
+    // 出力ファイル名を生成
+    char* output_path = malloc(strlen(source_path) + 3);
+    if (output_path == NULL) {
+        free(source);
+        return 74;
+    }
+    strcpy(output_path, source_path);
+    strcat(output_path, ".o");
+
+    // コンパイル
+    SlangError error = compile(source, output_path);
     free(source);
+    free(output_path);
+
+    if (error != SLANG_SUCCESS) {
+        return 65;
+    }
 
     return 0;
 } 

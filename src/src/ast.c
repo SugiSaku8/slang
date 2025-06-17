@@ -1,6 +1,234 @@
 #include "../include/ast.h"
+#include "../include/common.h"
 #include <stdlib.h>
 #include <string.h>
+
+// ASTノードの作成
+ASTNode* ast_create_node(NodeType type, size_t line, size_t column) {
+    ASTNode* node = malloc(sizeof(ASTNode));
+    if (node == NULL) return NULL;
+
+    node->type = type;
+    node->line = line;
+    node->column = column;
+    node->next = NULL;
+    return node;
+}
+
+// ASTノードの破棄
+void ast_destroy_node(ASTNode* node) {
+    if (node == NULL) return;
+
+    switch (node->type) {
+        case NODE_PROGRAM:
+            if (node->as.program.declarations) {
+                for (size_t i = 0; i < vector_size(node->as.program.declarations); i++) {
+                    ASTNode** decl = vector_get(node->as.program.declarations, i);
+                    ast_destroy_node(*decl);
+                }
+                vector_destroy(node->as.program.declarations);
+            }
+            break;
+
+        case NODE_FUNCTION_DECL:
+            free(node->as.function.name);
+            if (node->as.function.parameters) {
+                for (size_t i = 0; i < vector_size(node->as.function.parameters); i++) {
+                    ASTNode** param = vector_get(node->as.function.parameters, i);
+                    ast_destroy_node(*param);
+                }
+                vector_destroy(node->as.function.parameters);
+            }
+            ast_destroy_node(node->as.function.body);
+            ast_destroy_node(node->as.function.return_type);
+            break;
+
+        case NODE_VARIABLE_DECL:
+            free(node->as.variable.name);
+            ast_destroy_node(node->as.variable.initializer);
+            ast_destroy_node(node->as.variable.type);
+            break;
+
+        case NODE_STRUCT_DECL:
+            free(node->as.structure.name);
+            if (node->as.structure.fields) {
+                for (size_t i = 0; i < vector_size(node->as.structure.fields); i++) {
+                    ASTNode** field = vector_get(node->as.structure.fields, i);
+                    ast_destroy_node(*field);
+                }
+                vector_destroy(node->as.structure.fields);
+            }
+            break;
+
+        case NODE_IMPL_DECL:
+            free(node->as.implementation.trait_name);
+            free(node->as.implementation.type_name);
+            if (node->as.implementation.methods) {
+                for (size_t i = 0; i < vector_size(node->as.implementation.methods); i++) {
+                    ASTNode** method = vector_get(node->as.implementation.methods, i);
+                    ast_destroy_node(*method);
+                }
+                vector_destroy(node->as.implementation.methods);
+            }
+            break;
+
+        case NODE_TRAIT_DECL:
+            free(node->as.trait.name);
+            if (node->as.trait.methods) {
+                for (size_t i = 0; i < vector_size(node->as.trait.methods); i++) {
+                    ASTNode** method = vector_get(node->as.trait.methods, i);
+                    ast_destroy_node(*method);
+                }
+                vector_destroy(node->as.trait.methods);
+            }
+            break;
+
+        case NODE_BLOCK:
+            if (node->as.block.statements) {
+                for (size_t i = 0; i < vector_size(node->as.block.statements); i++) {
+                    ASTNode** stmt = vector_get(node->as.block.statements, i);
+                    ast_destroy_node(*stmt);
+                }
+                vector_destroy(node->as.block.statements);
+            }
+            break;
+
+        case NODE_IF:
+            ast_destroy_node(node->as.if_stmt.condition);
+            ast_destroy_node(node->as.if_stmt.then_branch);
+            ast_destroy_node(node->as.if_stmt.else_branch);
+            break;
+
+        case NODE_WHILE:
+            ast_destroy_node(node->as.while_stmt.condition);
+            ast_destroy_node(node->as.while_stmt.body);
+            break;
+
+        case NODE_FOR:
+            ast_destroy_node(node->as.for_stmt.initializer);
+            ast_destroy_node(node->as.for_stmt.condition);
+            ast_destroy_node(node->as.for_stmt.increment);
+            ast_destroy_node(node->as.for_stmt.body);
+            break;
+
+        case NODE_BINARY:
+            ast_destroy_node(node->as.binary.left);
+            ast_destroy_node(node->as.binary.right);
+            break;
+
+        case NODE_UNARY:
+            ast_destroy_node(node->as.unary.operand);
+            break;
+
+        case NODE_CALL:
+            ast_destroy_node(node->as.call.callee);
+            if (node->as.call.arguments) {
+                for (size_t i = 0; i < vector_size(node->as.call.arguments); i++) {
+                    ASTNode** arg = vector_get(node->as.call.arguments, i);
+                    ast_destroy_node(*arg);
+                }
+                vector_destroy(node->as.call.arguments);
+            }
+            break;
+
+        case NODE_MEMBER:
+            ast_destroy_node(node->as.member.object);
+            free(node->as.member.member);
+            break;
+
+        case NODE_ARRAY_ACCESS:
+            ast_destroy_node(node->as.array_access.array);
+            ast_destroy_node(node->as.array_access.index);
+            break;
+
+        case NODE_LITERAL:
+            if (node->as.literal.type == LITERAL_STRING) {
+                free(node->as.literal.value.string);
+            }
+            break;
+
+        case NODE_IDENTIFIER:
+            free(node->as.identifier.name);
+            break;
+
+        default:
+            break;
+    }
+
+    free(node);
+}
+
+// プログラムノードの作成
+ASTNode* ast_create_program(Vector* declarations) {
+    ASTNode* node = ast_create_node(NODE_PROGRAM, 1, 1);
+    if (node == NULL) return NULL;
+
+    node->as.program.declarations = declarations;
+    return node;
+}
+
+// 関数宣言ノードの作成
+ASTNode* ast_create_function_decl(char* name, Vector* parameters, ASTNode* body, ASTNode* return_type) {
+    ASTNode* node = ast_create_node(NODE_FUNCTION_DECL, 1, 1);
+    if (node == NULL) return NULL;
+
+    node->as.function.name = strdup(name);
+    node->as.function.parameters = parameters;
+    node->as.function.body = body;
+    node->as.function.return_type = return_type;
+    return node;
+}
+
+// 変数宣言ノードの作成
+ASTNode* ast_create_variable_decl(char* name, ASTNode* initializer, ASTNode* type) {
+    ASTNode* node = ast_create_node(NODE_VARIABLE_DECL, 1, 1);
+    if (node == NULL) return NULL;
+
+    node->as.variable.name = strdup(name);
+    node->as.variable.initializer = initializer;
+    node->as.variable.type = type;
+    return node;
+}
+
+// 二項演算ノードの作成
+ASTNode* ast_create_binary(TokenType operator, ASTNode* left, ASTNode* right) {
+    ASTNode* node = ast_create_node(NODE_BINARY, left->line, left->column);
+    if (node == NULL) return NULL;
+
+    node->as.binary.operator = operator;
+    node->as.binary.left = left;
+    node->as.binary.right = right;
+    return node;
+}
+
+// 単項演算ノードの作成
+ASTNode* ast_create_unary(TokenType operator, ASTNode* operand) {
+    ASTNode* node = ast_create_node(NODE_UNARY, operand->line, operand->column);
+    if (node == NULL) return NULL;
+
+    node->as.unary.operator = operator;
+    node->as.unary.operand = operand;
+    return node;
+}
+
+// リテラルノードの作成
+ASTNode* ast_create_literal(LiteralType type, LiteralValue value) {
+    ASTNode* node = ast_create_node(NODE_LITERAL, 1, 1);
+    if (node == NULL) return NULL;
+
+    node->as.literal.type = type;
+    node->as.literal.value = value;
+    return node;
+}
+
+// 識別子ノードの作成
+ASTNode* ast_create_identifier(char* name) {
+    ASTNode* node = ast_create_node(NODE_IDENTIFIER, 1, 1);
+    if (node == NULL) return NULL;
+
+    node->as.identifier.name = strdup(name);
+    return node;
+}
 
 ASTNode* create_variable_node(const char* name, Type* type) {
     ASTNode* node = malloc(sizeof(ASTNode));
