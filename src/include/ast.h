@@ -5,6 +5,12 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+// Type definitions
+typedef struct {
+    char* name;
+    Type* type;
+} TypeDefinition;
+
 typedef struct {
     char* name;
     Type* type;
@@ -18,6 +24,13 @@ typedef struct {
     struct ASTNode* body;
     int priority;
 } Function;
+
+typedef struct {
+    Function** functions;
+    size_t function_count;
+    TypeDefinition** type_definitions;
+    size_t type_definition_count;
+} AST;
 
 typedef struct {
     char* name;

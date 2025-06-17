@@ -8,39 +8,41 @@
 #include "type_system.h"
 #include <stdbool.h>
 
+// Token definitions
+#define TOKEN_LPAREN 1
+#define TOKEN_RPAREN 2
+
+// Parameter structure
+typedef struct {
+    char* name;
+    Type* type_annotation;
+} Parameter;
+
+// Parser structure
 typedef struct {
     Lexer* lexer;
-    Token current_token;
-    Token previous_token;
+    Token current;
+    Token previous;
     bool had_error;
+    bool panic_mode;
 } Parser;
 
 // Function declarations
-Parser* create_parser(Lexer* lexer);
-void free_parser(Parser* parser);
-ASTNode* parse_program(Parser* parser);
-ASTNode* parse_statement(Parser* parser);
-ASTNode* parse_expression(Parser* parser);
-ASTNode* parse_primary(Parser* parser);
-ASTNode* parse_function_declaration(Parser* parser);
-ASTNode* parse_let_statement(Parser* parser);
-ASTNode* parse_if_statement(Parser* parser);
-ASTNode* parse_while_statement(Parser* parser);
-ASTNode* parse_block_statement(Parser* parser);
-ASTNode* parse_expression_statement(Parser* parser);
-ASTNode* parse_assignment(Parser* parser);
-ASTNode* parse_call_expression(Parser* parser);
-ASTNode* parse_binary_expression(Parser* parser, int precedence);
-ASTNode* parse_unary_expression(Parser* parser);
+Parser* parser_new(Lexer* lexer);
+void parser_free(Parser* parser);
+AST* parser_parse(Parser* parser);
+SlangError* parser_parse_type(Parser* parser, Type* type);
+SlangError* parser_parse_identifier(Parser* parser, char** name);
+SlangError* parser_expect(Parser* parser, TokenType type);
+
+// AST manipulation functions
+void ast_add_function(AST* ast, Function* function);
+void ast_add_type_definition(AST* ast, TypeDefinition* type_def);
 
 // Additional function declarations
-SlangError* parser_parse(Parser* parser, AST* ast);
 SlangError* parser_parse_function(Parser* parser, Function* function);
-SlangError* parser_parse_type(Parser* parser, Type* type);
 SlangError* parser_parse_type_definition(Parser* parser, TypeDefinition* type_def);
-SlangError* parser_parse_identifier(Parser* parser, char** name);
 SlangError* parser_parse_integer(Parser* parser, int* value);
 SlangError* parser_parse_block(Parser* parser, ASTNode** block);
-SlangError* parser_expect(Parser* parser, TokenType expected);
 
 #endif // PARSER_H 

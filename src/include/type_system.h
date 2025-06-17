@@ -14,13 +14,17 @@ typedef enum {
     TYPE_BOOLEAN,
     TYPE_FUNCTION,
     TYPE_VOID,
-    TYPE_UNKNOWN
+    TYPE_UNKNOWN,
+    TYPE_NAMED
 } TypeKind;
 
 // Type structure
 typedef struct Type {
     TypeKind kind;
     union {
+        struct {
+            char* name;
+        } named;
         struct {
             struct Type* return_type;
             struct Type** parameter_types;
