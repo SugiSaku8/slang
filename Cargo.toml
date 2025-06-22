@@ -7,7 +7,7 @@ description = "A new compiled programming language S"
 
 [dependencies]
 logos = "0.14.0"  # For lexer
-thiserror = "1.0"  # For error handling
+thiserror = "2.0"  # For error handling
 anyhow = "1.0"     # For error handling
 
 [dev-dependencies]
