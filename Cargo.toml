@@ -11,4 +11,4 @@ thiserror = "2.0"  # For error handling
 anyhow = "1.0"     # For error handling
 
 [dev-dependencies]
-criterion = "0.6"  # For benchmarking 
+criterion = "0.8"  # For benchmarking 
