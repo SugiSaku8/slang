@@ -6,7 +6,7 @@ authors = ["Your Name <your.email@example.com>"]
 description = "A new compiled programming language S"
 
 [dependencies]
-logos = "0.14.0"  # For lexer
+logos = "0.16.0"  # For lexer
 thiserror = "2.0"  # For error handling
 anyhow = "1.0"     # For error handling
 
